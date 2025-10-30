@@ -85,7 +85,30 @@ h1 {
     color: white;
 }
 
-.canvas-container {
+.comparison-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.comparison-section.single {
+    grid-template-columns: 1fr;
+}
+
+.canvas-wrapper, .reference-wrapper {
+    display: flex;
+    flex-direction: column;
+}
+
+.canvas-wrapper h3, .reference-wrapper h3 {
+    text-align: center;
+    color: #333;
+    margin-bottom: 10px;
+    font-size: 18px;
+}
+
+.canvas-container, .reference-container {
     display: flex;
     justify-content: center;
     background: #fafafa;
@@ -94,12 +117,72 @@ h1 {
     overflow: auto;
 }
 
-#canvas {
+#canvas, #monaLisaImg {
     border: 2px solid #ddd;
     border-radius: 4px;
     background: white;
+    max-width: 100%;
+    height: auto;
+}
+
+#canvas {
     cursor: crosshair;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+#monaLisaImg {
+    display: block;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.hidden {
+    display: none;
+}
+
+.gamebar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    padding: 12px 15px;
+    background: #eef1ff;
+    border: 2px dashed #667eea;
+    border-radius: 8px;
+    margin-bottom: 15px;
+}
+
+.timer {
+    width: 220px;
+    height: 10px;
+    background: #e6e6e6;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #d2d2d2;
+}
+
+#timerBar {
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, #22c55e, #f59e0b, #ef4444);
+    transition: width 0.2s linear;
+}
+
+.flash {
+    animation: flash 0.3s ease-in-out;
+}
+
+@keyframes flash {
+    0% { background-color: rgba(255, 255, 0, 0.3); }
+    100% { background-color: transparent; }
+}
+
+.comparison-result {
+    margin-left: 20px;
+    padding: 10px 20px;
+    background: #f5f5f5;
+    border-radius: 6px;
+    font-weight: 500;
+    color: #333;
 }
 
 @media (max-width: 768px) {
@@ -112,9 +195,18 @@ h1 {
         justify-content: space-between;
     }
     
-    #canvas {
+    .comparison-section {
+        grid-template-columns: 1fr;
+    }
+    
+    #canvas, #monaLisaImg {
         max-width: 100%;
         height: auto;
+    }
+    
+    .comparison-result {
+        margin-left: 0;
+        margin-top: 10px;
     }
 }
 

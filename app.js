@@ -26,6 +26,7 @@ let currentColor = '#000000';
 let brushSize = 5;
 let lastX = 0;
 let lastY = 0;
+let inputEnabled = true;
 
 // Get elements
 const colorPicker = document.getElementById('colorPicker');
@@ -72,6 +73,7 @@ brushBtn.addEventListener('click', () => {
 
 // Drawing functions
 function startDrawing(e) {
+    if (!inputEnabled) return;
     isDrawing = true;
     const rect = canvas.getBoundingClientRect();
     lastX = e.clientX - rect.left;
@@ -138,3 +140,424 @@ ctx.lineCap = 'round';
 ctx.lineJoin = 'round';
 ctx.lineWidth = brushSize;
 ctx.strokeStyle = currentColor;
+
+// Mona Lisa image loading and comparison
+const monaLisaImg = document.getElementById('monaLisaImg');
+const compareBtn = document.getElementById('compareBtn');
+const comparisonResult = document.getElementById('comparisonResult');
+const gameBar = document.getElementById('gameBar');
+const toolsBar = document.getElementById('toolsBar');
+const startGameBtn = document.getElementById('startGameBtn');
+const peekBtn = document.getElementById('peekBtn');
+const finishBtn = document.getElementById('finishBtn');
+const phaseLabel = document.getElementById('phaseLabel');
+const countdownLabel = document.getElementById('countdownLabel');
+const timerBar = document.getElementById('timerBar');
+const referenceTitle = document.getElementById('referenceTitle');
+const referenceWrapper = document.getElementById('referenceWrapper');
+const comparisonSection = document.getElementById('comparisonSection');
+const resultsBar = document.getElementById('resultsBar');
+let monaLisaLoaded = false;
+
+// Load Mona Lisa image
+// Using a public domain/host-representative image URL
+monaLisaImg.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg/402px-Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg';
+
+monaLisaImg.onload = () => {
+    monaLisaLoaded = true;
+    // Scale image to match canvas aspect ratio if needed
+    const canvasAspect = canvas.width / canvas.height;
+    const imgAspect = monaLisaImg.naturalWidth / monaLisaImg.naturalHeight;
+    
+    if (Math.abs(canvasAspect - imgAspect) > 0.1) {
+        // Adjust image display size to roughly match canvas
+        monaLisaImg.style.width = canvas.width + 'px';
+        monaLisaImg.style.height = 'auto';
+    }
+};
+
+monaLisaImg.onerror = () => {
+    // Fallback to a different image source if first fails
+    monaLisaImg.src = 'https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=400';
+};
+
+// Image comparison functions
+function getImageDataFromCanvas(sourceCanvas, width, height) {
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = width;
+    tempCanvas.height = height;
+    const tempCtx = tempCanvas.getContext('2d');
+    
+    // Draw source to temp canvas at new size
+    tempCtx.drawImage(sourceCanvas, 0, 0, width, height);
+    return tempCtx.getImageData(0, 0, width, height);
+}
+
+function getImageDataFromImage(img, width, height) {
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = width;
+    tempCanvas.height = height;
+    const tempCtx = tempCanvas.getContext('2d');
+    
+    // Calculate scaling to fill while maintaining aspect ratio
+    const imgAspect = img.naturalWidth / img.naturalHeight;
+    const canvasAspect = width / height;
+    
+    let drawWidth = width;
+    let drawHeight = height;
+    let x = 0;
+    let y = 0;
+    
+    if (imgAspect > canvasAspect) {
+        // Image is wider, fit to height
+        drawHeight = height;
+        drawWidth = height * imgAspect;
+        x = (width - drawWidth) / 2;
+    } else {
+        // Image is taller, fit to width
+        drawWidth = width;
+        drawHeight = width / imgAspect;
+        y = (height - drawHeight) / 2;
+    }
+    
+    // Fill with white background
+    tempCtx.fillStyle = '#ffffff';
+    tempCtx.fillRect(0, 0, width, height);
+    
+    // Draw image centered
+    tempCtx.drawImage(img, x, y, drawWidth, drawHeight);
+    return tempCtx.getImageData(0, 0, width, height);
+}
+
+function getLuminance(r, g, b) {
+    // Standard luminance formula
+    return 0.299 * r + 0.587 * g + 0.114 * b;
+}
+
+function compareImages(drawingData, referenceData, width, height) {
+    const scores = {
+        colorSimilarity: 0,
+        luminanceSimilarity: 0,
+        edgeSimilarity: 0,
+        structuralSimilarity: 0
+    };
+    
+    let totalPixels = width * height;
+    let colorDiff = 0;
+    let luminanceDiff = 0;
+    let edgeDiff = 0;
+    let structureDiff = 0;
+    
+    // Pre-calculate edge detection (simple Sobel-like)
+    const drawingEdges = detectEdges(drawingData, width, height);
+    const referenceEdges = detectEdges(referenceData, width, height);
+    
+    // Calculate structural components
+    let drawingBrightnessSum = 0;
+    let referenceBrightnessSum = 0;
+    let drawingBrightnessSq = 0;
+    let referenceBrightnessSq = 0;
+    let crossSum = 0;
+    
+    for (let i = 0; i < totalPixels; i++) {
+        const idx = i * 4;
+        
+        const dr = drawingData.data[idx];
+        const dg = drawingData.data[idx + 1];
+        const db = drawingData.data[idx + 2];
+        
+        const rr = referenceData.data[idx];
+        const rg = referenceData.data[idx + 1];
+        const rb = referenceData.data[idx + 2];
+        
+        // Color similarity (Euclidean distance in RGB space)
+        const colorDistance = Math.sqrt(
+            Math.pow(dr - rr, 2) +
+            Math.pow(dg - rg, 2) +
+            Math.pow(db - rb, 2)
+        );
+        // Normalize to 0-1 (max distance is 441.67)
+        colorDiff += colorDistance / 441.67;
+        
+        // Luminance similarity
+        const dLum = getLuminance(dr, dg, db);
+        const rLum = getLuminance(rr, rg, rb);
+        const lumDistance = Math.abs(dLum - rLum) / 255;
+        luminanceDiff += lumDistance;
+        
+        // Edge similarity
+        const edgeDistance = Math.abs(drawingEdges[i] - referenceEdges[i]) / 255;
+        edgeDiff += edgeDistance;
+        
+        // Structural similarity components
+        drawingBrightnessSum += dLum;
+        referenceBrightnessSum += rLum;
+        drawingBrightnessSq += dLum * dLum;
+        referenceBrightnessSq += rLum * rLum;
+        crossSum += dLum * rLum;
+    }
+    
+    // Calculate average differences (lower is better)
+    scores.colorSimilarity = 1 - (colorDiff / totalPixels);
+    scores.luminanceSimilarity = 1 - (luminanceDiff / totalPixels);
+    scores.edgeSimilarity = 1 - (edgeDiff / totalPixels);
+    
+    // Calculate structural similarity (SSIM-like metric)
+    const drawingMean = drawingBrightnessSum / totalPixels;
+    const referenceMean = referenceBrightnessSum / totalPixels;
+    const drawingVar = (drawingBrightnessSq / totalPixels) - (drawingMean * drawingMean);
+    const referenceVar = (referenceBrightnessSq / totalPixels) - (referenceMean * referenceMean);
+    const covariance = (crossSum / totalPixels) - (drawingMean * referenceMean);
+    
+    const c1 = 0.01 * 255;
+    const c2 = 0.03 * 255;
+    const numerator = (2 * drawingMean * referenceMean + c1) * (2 * covariance + c2);
+    const denominator = (drawingMean * drawingMean + referenceMean * referenceMean + c1) * (drawingVar + referenceVar + c2);
+    scores.structuralSimilarity = numerator / denominator;
+    
+    return scores;
+}
+
+function detectEdges(imageData, width, height) {
+    const edges = new Uint8Array(width * height);
+    const data = imageData.data;
+    
+    for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+            const idx = (y * width + x) * 4;
+            const centerLum = getLuminance(data[idx], data[idx + 1], data[idx + 2]);
+            
+            // Simple gradient detection (Sobel-like)
+            const rightIdx = ((y * width + (x + 1)) * 4);
+            const rightLum = getLuminance(data[rightIdx], data[rightIdx + 1], data[rightIdx + 2]);
+            
+            const bottomIdx = (((y + 1) * width + x) * 4);
+            const bottomLum = getLuminance(data[bottomIdx], data[bottomIdx + 1], data[bottomIdx + 2]);
+            
+            const dx = Math.abs(centerLum - rightLum);
+            const dy = Math.abs(centerLum - bottomLum);
+            edges[y * width + x] = Math.min(255, Math.sqrt(dx * dx + dy * dy));
+        }
+    }
+    
+    return edges;
+}
+
+function compareWithMonaLisa() {
+    if (!monaLisaLoaded) {
+        comparisonResult.textContent = 'Loading Mona Lisa...';
+        return;
+    }
+    
+    comparisonResult.textContent = 'Analyzing...';
+    
+    // Downscale to 64x64 for comparison (makes it more forgiving)
+    const comparisonSize = 64;
+    
+    const drawingData = getImageDataFromCanvas(canvas, comparisonSize, comparisonSize);
+    const referenceData = getImageDataFromImage(monaLisaImg, comparisonSize, comparisonSize);
+    
+    const scores = compareImages(drawingData, referenceData, comparisonSize, comparisonSize);
+    
+    // Weighted average (emphasize structure and edges for "shitty drawings")
+    const overallSimilarity = (0.15 * scores.colorSimilarity) + 
+                    (0.25 * scores.luminanceSimilarity) + 
+                    (0.25 * scores.edgeSimilarity) + 
+                    (0.35 * scores.structuralSimilarity);
+    
+    const similarityPercent = Math.round(overallSimilarity * 100);
+    
+    // Generate fun feedback message
+    let message = `Similarity: ${similarityPercent}%`;
+    
+    if (similarityPercent >= 80) {
+        message += ' - Masterpiece!';
+    } else if (similarityPercent >= 60) {
+        message += ' - Impressive!';
+    } else if (similarityPercent >= 40) {
+        message += ' - Not bad!';
+    } else if (similarityPercent >= 20) {
+        message += ' - Keep trying!';
+    } else {
+        message += ' - Abstract art!';
+    }
+    
+    comparisonResult.innerHTML = `${message}<br>` +
+        `<small style="color: #666;">Color: ${Math.round(scores.colorSimilarity * 100)}% | ` +
+        `Structure: ${Math.round(scores.structuralSimilarity * 100)}% | ` +
+        `Edges: ${Math.round(scores.edgeSimilarity * 100)}%</small>`;
+}
+
+compareBtn.addEventListener('click', compareWithMonaLisa);
+
+// Game state
+let gameActive = false;
+let isPeeking = false;
+let peeksLeft = 3;
+const MEMORIZE_MS = 5000;
+const DRAW_MS = 30000; // 30s to draw
+let memorizeTimerId = null;
+let drawTimerId = null;
+let countdownIntervalId = null;
+
+function setInputEnabled(enabled) {
+    inputEnabled = enabled;
+    canvas.style.pointerEvents = enabled ? 'auto' : 'none';
+}
+
+function resetCanvas() {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = currentTool === 'brush' ? currentColor : '#ffffff';
+}
+
+function updateTimerBar(progress) {
+    // progress: 0..1
+    timerBar.style.width = Math.max(0, Math.min(1, progress)) * 100 + '%';
+}
+
+function showReference(show) {
+    monaLisaImg.classList.toggle('hidden', !show);
+    referenceWrapper.classList.toggle('hidden', !show);
+    comparisonSection.classList.toggle('single', !show);
+}
+
+function setResultsBarVisible(visible) {
+    resultsBar.classList.toggle('hidden', !visible);
+}
+
+function enterIdle() {
+    gameActive = false;
+    isPeeking = false;
+    setInputEnabled(false);
+    showReference(false);
+    gameBar.classList.remove('hidden');
+    toolsBar.classList.add('hidden');
+    compareBtn.classList.remove('hidden');
+    referenceTitle.textContent = 'Mona Lisa';
+    setResultsBarVisible(false);
+}
+
+function enterGameReady() {
+    gameActive = true;
+    isPeeking = false;
+    peeksLeft = 3;
+    phaseLabel.textContent = 'Ready';
+    countdownLabel.textContent = '';
+    document.getElementById('peeksLeft').textContent = String(peeksLeft);
+    updateTimerBar(0);
+    showReference(false);
+    gameBar.classList.remove('hidden');
+    compareBtn.classList.add('hidden');
+    referenceTitle.textContent = 'Reference (Hidden)';
+    setResultsBarVisible(false);
+    peekBtn.disabled = true;
+    finishBtn.disabled = true;
+    toolsBar.classList.add('hidden');
+}
+
+function startMemorizePhase() {
+    resetCanvas();
+    setInputEnabled(false);
+    phaseLabel.textContent = 'Memorize';
+    showReference(true);
+    countdownLabel.textContent = '5s';
+
+    const start = Date.now();
+    updateTimerBar(0);
+    countdownIntervalId = setInterval(() => {
+        const elapsed = Date.now() - start;
+        const remaining = Math.max(0, MEMORIZE_MS - elapsed);
+        countdownLabel.textContent = Math.ceil(remaining / 1000) + 's';
+        updateTimerBar(elapsed / MEMORIZE_MS);
+        if (remaining <= 0) {
+            clearInterval(countdownIntervalId);
+        }
+    }, 100);
+
+    memorizeTimerId = setTimeout(() => {
+        showReference(false);
+        startDrawPhase();
+    }, MEMORIZE_MS);
+}
+
+function startDrawPhase() {
+    phaseLabel.textContent = 'Draw!';
+    setInputEnabled(true);
+    peekBtn.disabled = false;
+    finishBtn.disabled = false;
+    toolsBar.classList.remove('hidden');
+    const start = Date.now();
+    countdownLabel.textContent = Math.ceil(DRAW_MS / 1000) + 's';
+    updateTimerBar(0);
+    countdownIntervalId = setInterval(() => {
+        const elapsed = Date.now() - start;
+        const remaining = Math.max(0, DRAW_MS - elapsed);
+        countdownLabel.textContent = Math.ceil(remaining / 1000) + 's';
+        updateTimerBar(elapsed / DRAW_MS);
+        if (remaining <= 0) {
+            clearInterval(countdownIntervalId);
+        }
+    }, 100);
+
+    drawTimerId = setTimeout(() => {
+        finishGame();
+    }, DRAW_MS);
+}
+
+function doPeek() {
+    if (peeksLeft <= 0 || isPeeking) return;
+    isPeeking = true;
+    peeksLeft -= 1;
+    document.getElementById('peeksLeft').textContent = String(peeksLeft);
+    showReference(true);
+    peekBtn.classList.add('flash');
+    setTimeout(() => peekBtn.classList.remove('flash'), 350);
+    setTimeout(() => {
+        showReference(false);
+        isPeeking = false;
+        if (peeksLeft <= 0) peekBtn.disabled = true;
+    }, 2000);
+}
+
+function finishGame() {
+    if (!gameActive) return;
+    // stop timers
+    clearTimeout(memorizeTimerId);
+    clearTimeout(drawTimerId);
+    clearInterval(countdownIntervalId);
+    peekBtn.disabled = true;
+    finishBtn.disabled = true;
+    setInputEnabled(false);
+    showReference(true);
+    phaseLabel.textContent = 'Results';
+    countdownLabel.textContent = '';
+    updateTimerBar(1);
+    toolsBar.classList.add('hidden');
+
+    // Auto-compare and show results
+    compareWithMonaLisa();
+
+    // Show Play Again on start button
+    startGameBtn.textContent = 'Play Again';
+    startGameBtn.disabled = false;
+    setResultsBarVisible(true);
+}
+
+// Wire up gamebar buttons
+startGameBtn.addEventListener('click', () => {
+    if (!monaLisaLoaded) {
+        phaseLabel.textContent = 'Loading reference...';
+        return;
+    }
+    startGameBtn.disabled = true;
+    startGameBtn.textContent = 'Running...';
+    enterGameReady();
+    startMemorizePhase();
+});
+
+peekBtn.addEventListener('click', doPeek);
+finishBtn.addEventListener('click', finishGame);
+
+// Initialize default mode: show both and results bar
+enterIdle();

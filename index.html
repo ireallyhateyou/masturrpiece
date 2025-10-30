@@ -8,7 +8,7 @@
 </head>
 <body>
     <div class="container">
-        <div class="toolbar">
+        <div class="toolbar hidden" id="toolsBar">
             <div class="tool-group">
                 <label for="colorPicker">Color:</label>
                 <input type="color" id="colorPicker" value="#000000">
@@ -26,13 +26,42 @@
                 <button id="brushBtn" class="btn active">Brush</button>
             </div>
         </div>
+
+        <div class="gamebar hidden" id="gameBar">
+            <div class="tool-group">
+                <button id="startGameBtn" class="btn">Start Challenge</button>
+                <button id="peekBtn" class="btn" disabled>Peek (<span id="peeksLeft">3</span>)</button>
+                <button id="finishBtn" class="btn" disabled>Finish</button>
+            </div>
+            <div class="tool-group">
+                <span id="phaseLabel">Ready</span>
+                <div class="timer">
+                    <div id="timerBar"></div>
+                </div>
+                <span id="countdownLabel"></span>
+            </div>
+        </div>
+
+        <div class="comparison-section" id="comparisonSection">
+            <div class="canvas-wrapper">
+                <h3>Your Drawing</h3>
+                <div class="canvas-container">
+                    <canvas id="canvas"></canvas>
+                </div>
+            </div>
+            <div class="reference-wrapper hidden" id="referenceWrapper">
+                <h3 id="referenceTitle">Mona Lisa</h3>
+                <div class="reference-container">
+                    <img id="monaLisaImg" class="hidden" alt="Mona Lisa" crossorigin="anonymous">
+                </div>
+            </div>
+        </div>
         
-        <div class="canvas-container">
-            <canvas id="canvas"></canvas>
+        <div class="toolbar" id="resultsBar" style="margin-top: 20px;">
+            <button id="compareBtn" class="btn">Compare with Mona Lisa</button>
+            <div id="comparisonResult" class="comparison-result"></div>
         </div>
     </div>
-    
     <script src="app.js"></script>
 </body>
 </html>
-
