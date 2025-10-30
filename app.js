@@ -146,8 +146,22 @@ const referenceWrapper = document.getElementById('referenceWrapper');
 const comparisonSection = document.getElementById('comparisonSection');
 const resultsBar = document.getElementById('resultsBar');
 let monaLisaLoaded = false;
+const paintings = [
+    { title: 'Mona Lisa', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg/402px-Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg' },
+    { title: 'The Starry Night', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Vincent_van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg/480px-Vincent_van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg' },
+    { title: 'The Scream', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f4/The_Scream.jpg/480px-The_Scream.jpg' },
+    { title: 'Girl with a Pearl Earring', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Meisje_met_de_parel.jpg/480px-Meisje_met_de_parel.jpg' }
+];
+let currentPaintingIndex = 0;
 
-monaLisaImg.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg/402px-Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg';
+function loadCurrentPainting() {
+    monaLisaLoaded = false;
+    const { title, src } = paintings[currentPaintingIndex];
+    referenceTitle.textContent = title;
+    monaLisaImg.style.width = '';
+    monaLisaImg.style.height = '';
+    monaLisaImg.src = src;
+}
 
 monaLisaImg.onload = () => {
     monaLisaLoaded = true;
@@ -292,7 +306,7 @@ function detectEdges(imageData, width, height) {
 function compareWithMonaLisa() {
     if (!monaLisaLoaded) {
         comparisonResult.textContent = 'Loading Mona Lisa...';
-        return;
+        return null;
     }
     comparisonResult.textContent = 'Analyzing...';
     const comparisonSize = 64;
@@ -321,6 +335,7 @@ function compareWithMonaLisa() {
         `<small style="color: #666;">Color: ${Math.round(scores.colorSimilarity * 100)}% | ` +
         `Structure: ${Math.round(scores.structuralSimilarity * 100)}% | ` +
         `Edges: ${Math.round(scores.edgeSimilarity * 100)}%</small>`;
+    return similarityPercent;
 }
 
 compareBtn.addEventListener('click', compareWithMonaLisa);
@@ -466,10 +481,29 @@ function finishGame() {
     countdownLabel.textContent = '';
     updateTimerBar(1);
     toolsBar.classList.add('hidden');
-    compareWithMonaLisa();
-    startGameBtn.textContent = 'Play Again';
-    startGameBtn.disabled = false;
-    setResultsBarVisible(true);
+    const similarity = compareWithMonaLisa();
+    if (similarity !== null && similarity >= 50) {
+        phaseLabel.textContent = 'Round cleared!';
+        setTimeout(() => {
+            currentPaintingIndex = (currentPaintingIndex + 1) % paintings.length;
+            setResultsBarVisible(false);
+            phaseLabel.textContent = 'Loading next...';
+            loadCurrentPainting();
+            const waitForLoad = setInterval(() => {
+                if (monaLisaLoaded) {
+                    clearInterval(waitForLoad);
+                    startGameBtn.disabled = true;
+                    startGameBtn.textContent = 'Running...';
+                    enterGameReady();
+                    startMemorizePhase();
+                }
+            }, 100);
+        }, 1000);
+    } else {
+        startGameBtn.textContent = 'Play Again';
+        startGameBtn.disabled = false;
+        setResultsBarVisible(true);
+    }
 }
 
 startGameBtn.addEventListener('click', () => {
@@ -486,4 +520,5 @@ startGameBtn.addEventListener('click', () => {
 peekBtn.addEventListener('click', doPeek);
 finishBtn.addEventListener('click', finishGame);
 
+loadCurrentPainting();
 enterIdle();
