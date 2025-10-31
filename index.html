@@ -25,6 +25,7 @@
                 <button id="clearBtn" class="btn">Clear Canvas</button>
                 <button id="eraserBtn" class="btn">Eraser</button>
                 <button id="brushBtn" class="btn active">Brush</button>
+                <button id="noseModeBtn" class="btn">Nose Mode</button>
             </div>
         </div>
 
@@ -48,6 +49,7 @@
                 <h3>Your Drawing</h3>
                 <div class="canvas-container">
                     <canvas id="canvas"></canvas>
+                    <video id="video" autoplay playsinline class="hidden"></video>
                 </div>
             </div>
             <div class="reference-wrapper hidden" id="referenceWrapper">
@@ -63,6 +65,10 @@
             <div id="comparisonResult" class="comparison-result"></div>
         </div>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
     <script src="app.js"></script>
 </body>
 </html>

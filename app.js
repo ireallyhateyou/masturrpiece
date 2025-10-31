@@ -45,8 +45,25 @@ function resizeCanvas() {
     }
 }
 
+function updateVideoSize() {
+    if (noseModeActive && !video.classList.contains('hidden')) {
+        const canvasRect = canvas.getBoundingClientRect();
+        const containerRect = canvas.parentElement.getBoundingClientRect();
+        
+        video.style.width = canvasRect.width + 'px';
+        video.style.height = canvasRect.height + 'px';
+        video.style.left = (canvasRect.left - containerRect.left) + 'px';
+        video.style.top = (canvasRect.top - containerRect.top) + 'px';
+    }
+}
+
 resizeCanvas();
-window.addEventListener('resize', resizeCanvas);
+window.addEventListener('resize', () => {
+    resizeCanvas();
+    if (noseModeActive && video.classList.contains('hidden') === false) {
+        setTimeout(updateVideoSize, 100);
+    }
+});
 
 let isDrawing = false;
 let currentTool = 'brush';
@@ -62,6 +79,8 @@ const brushSizeValue = document.getElementById('brushSizeValue');
 const clearBtn = document.getElementById('clearBtn');
 const eraserBtn = document.getElementById('eraserBtn');
 const brushBtn = document.getElementById('brushBtn');
+const noseModeBtn = document.getElementById('noseModeBtn');
+const video = document.getElementById('video');
 
 colorPicker.addEventListener('change', (e) => {
     currentColor = e.target.value;
@@ -99,6 +118,7 @@ brushBtn.addEventListener('click', () => {
 
 function startDrawing(e) {
     if (!inputEnabled) return;
+    startTimer();
     isDrawing = true;
     const rect = canvas.getBoundingClientRect();
     lastX = e.clientX - rect.left;
@@ -204,6 +224,9 @@ monaLisaImg.onload = () => {
     resizeCanvas();
     monaLisaImg.style.width = canvas.width + 'px';
     monaLisaImg.style.height = 'auto';
+    if (noseModeActive) {
+        setTimeout(updateVideoSize, 100);
+    }
 };
 
 function getImageDataFromCanvas(sourceCanvas, width, height) {
@@ -379,14 +402,18 @@ let gameActive = false;
 let isPeeking = false;
 let peeksLeft = 3;
 const MEMORIZE_MS = 5000;
-const DRAW_MS = 30000;
+const DRAW_MS = 60000;
 let memorizeTimerId = null;
 let drawTimerId = null;
 let countdownIntervalId = null;
+let timerStartTime = null;
+let timerStarted = false;
 
 function setInputEnabled(enabled) {
     inputEnabled = enabled;
-    canvas.style.pointerEvents = enabled ? 'auto' : 'none';
+    if (!noseModeActive) {
+        canvas.style.pointerEvents = enabled ? 'auto' : 'none';
+    }
 }
 
 function resetCanvas() {
@@ -437,6 +464,8 @@ function enterGameReady() {
     peekBtn.disabled = true;
     finishBtn.disabled = true;
     toolsBar.classList.add('hidden');
+    timerStarted = false;
+    timerStartTime = null;
 }
 
 function startMemorizePhase() {
@@ -470,11 +499,31 @@ function startDrawPhase() {
     peekBtn.disabled = false;
     finishBtn.disabled = false;
     toolsBar.classList.remove('hidden');
-    const start = Date.now();
+    timerStarted = false;
+    timerStartTime = null;
     countdownLabel.textContent = Math.ceil(DRAW_MS / 1000) + 's';
     updateTimerBar(0);
+    
+    if (drawTimerId) {
+        clearTimeout(drawTimerId);
+        drawTimerId = null;
+    }
+    if (countdownIntervalId) {
+        clearInterval(countdownIntervalId);
+        countdownIntervalId = null;
+    }
+}
+
+function startTimer() {
+    if (timerStarted) return;
+    
+    timerStarted = true;
+    timerStartTime = Date.now();
+    countdownLabel.textContent = Math.ceil(DRAW_MS / 1000) + 's';
+    updateTimerBar(0);
+    
     countdownIntervalId = setInterval(() => {
-        const elapsed = Date.now() - start;
+        const elapsed = Date.now() - timerStartTime;
         const remaining = Math.max(0, DRAW_MS - elapsed);
         countdownLabel.textContent = Math.ceil(remaining / 1000) + 's';
         updateTimerBar(elapsed / DRAW_MS);
@@ -508,6 +557,8 @@ function finishGame() {
     clearTimeout(memorizeTimerId);
     clearTimeout(drawTimerId);
     clearInterval(countdownIntervalId);
+    timerStarted = false;
+    timerStartTime = null;
     peekBtn.disabled = true;
     finishBtn.disabled = true;
     setInputEnabled(false);
@@ -554,6 +605,228 @@ startGameBtn.addEventListener('click', () => {
 
 peekBtn.addEventListener('click', doPeek);
 finishBtn.addEventListener('click', finishGame);
+
+let noseModeActive = false;
+let faceMesh = null;
+let camera = null;
+let lastNoseX = 0;
+let lastNoseY = 0;
+let noseDrawing = false;
+let smoothedNoseX = 0;
+let smoothedNoseY = 0;
+const SMOOTHING_FACTOR = 0.3;
+const MIN_DISTANCE_THRESHOLD = 0.05;
+
+function initializeFaceMesh() {
+    if (typeof FaceMesh === 'undefined') {
+        throw new Error('MediaPipe Face Mesh library not loaded. Please check the script tags.');
+    }
+    
+    faceMesh = new FaceMesh({
+        locateFile: (file) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+        }
+    });
+    
+    faceMesh.setOptions({
+        maxNumFaces: 1,
+        refineLandmarks: true,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+    });
+    
+    faceMesh.onResults(onFaceMeshResults);
+}
+
+function onFaceMeshResults(results) {
+    if (!noseModeActive || !inputEnabled) return;
+    
+    if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+        const landmarks = results.multiFaceLandmarks[0];
+        const noseTip = landmarks[4];
+        
+        const canvasWidth = canvas.width;
+        const canvasHeight = canvas.height;
+        const canvasAspect = canvasWidth / canvasHeight;
+        const videoWidth = video.videoWidth || video.clientWidth || 640;
+        const videoHeight = video.videoHeight || video.clientHeight || 480;
+        const videoAspect = videoWidth / videoHeight;
+        
+        let noseX = noseTip.x;
+        let noseY = noseTip.y;
+        
+        let mappedX = noseX;
+        let mappedY = noseY;
+        
+        if (videoAspect > canvasAspect) {
+            const cropHeight = videoWidth / canvasAspect;
+            const cropOffset = (videoHeight - cropHeight) / 2;
+            mappedY = (noseY - cropOffset / videoHeight) / (cropHeight / videoHeight);
+            mappedX = noseX;
+        } else {
+            const cropWidth = videoHeight * canvasAspect;
+            const cropOffset = (videoWidth - cropWidth) / 2;
+            mappedX = (noseX - cropOffset / videoWidth) / (cropWidth / videoWidth);
+            mappedY = noseY;
+        }
+        
+        mappedX = Math.max(0, Math.min(1, mappedX));
+        mappedY = Math.max(0, Math.min(1, mappedY));
+        
+        smoothedNoseX = smoothedNoseX + SMOOTHING_FACTOR * (mappedX - smoothedNoseX);
+        smoothedNoseY = smoothedNoseY + SMOOTHING_FACTOR * (mappedY - smoothedNoseY);
+        
+        const canvasX = canvas.width - (smoothedNoseX * canvas.width);
+        const canvasY = smoothedNoseY * canvas.height;
+        
+        if (landmarks.length > 234) {
+            const leftCheek = landmarks[234];
+            const rightCheek = landmarks[454];
+            const faceWidth = Math.abs(leftCheek.x - rightCheek.x);
+            const distanceFactor = Math.min(Math.max(faceWidth * 50, 0.5), 2);
+            ctx.lineWidth = brushSize * distanceFactor;
+        }
+        
+        const distance = Math.sqrt(
+            Math.pow(canvasX - lastNoseX, 2) + 
+            Math.pow(canvasY - lastNoseY, 2)
+        );
+        
+        const minMovement = 2;
+        
+        if (!noseDrawing) {
+            if (lastNoseX === 0 && lastNoseY === 0) {
+                lastNoseX = canvasX;
+                lastNoseY = canvasY;
+            } else if (distance > MIN_DISTANCE_THRESHOLD * Math.min(canvas.width, canvas.height)) {
+                noseDrawing = true;
+                startTimer();
+            }
+        } else {
+            if (distance > minMovement) {
+                const constrainedX = Math.max(0, Math.min(canvas.width, canvasX));
+                const constrainedY = Math.max(0, Math.min(canvas.height, canvasY));
+                
+                ctx.beginPath();
+                ctx.moveTo(lastNoseX, lastNoseY);
+                ctx.lineTo(constrainedX, constrainedY);
+                ctx.stroke();
+                
+                lastNoseX = constrainedX;
+                lastNoseY = constrainedY;
+            }
+        }
+    } else {
+        noseDrawing = false;
+    }
+}
+
+async function startNoseMode() {
+    if (noseModeActive) {
+        stopNoseMode();
+        return;
+    }
+    
+    try {
+        if (typeof FaceMesh === 'undefined' || typeof Camera === 'undefined') {
+            alert('MediaPipe libraries are loading. Please wait a moment and try again.');
+            return;
+        }
+        
+        if (!faceMesh) {
+            initializeFaceMesh();
+        }
+        
+        const canvasAspect = canvas.width / canvas.height;
+        let camWidth = 640;
+        let camHeight = 480;
+        
+        if (canvasAspect > (640 / 480)) {
+            camHeight = Math.round(640 / canvasAspect);
+        } else {
+            camWidth = Math.round(480 * canvasAspect);
+        }
+        
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                facingMode: 'user',
+                width: { ideal: camWidth },
+                height: { ideal: camHeight }
+            } 
+        });
+        
+        video.srcObject = stream;
+        await video.play();
+        video.classList.remove('hidden');
+        
+        updateVideoSize();
+        
+        camera = new Camera(video, {
+            onFrame: async () => {
+                if (faceMesh && noseModeActive) {
+                    await faceMesh.send({ image: video });
+                }
+            },
+            width: camWidth,
+            height: camHeight
+        });
+        camera.start();
+        
+        noseModeActive = true;
+        noseModeBtn.classList.add('active');
+        noseModeBtn.textContent = 'Stop Nose Mode';
+        
+        canvas.style.pointerEvents = 'none';
+        
+        noseDrawing = false;
+        smoothedNoseX = 0;
+        smoothedNoseY = 0;
+        lastNoseX = 0;
+        lastNoseY = 0;
+    } catch (err) {
+        console.error('Error accessing camera:', err);
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+            alert('Camera access denied. Please allow camera permissions in your browser settings and try again.');
+        } else {
+            alert('Could not access camera: ' + err.message);
+        }
+    }
+}
+
+function stopNoseMode() {
+    noseModeActive = false;
+    noseDrawing = false;
+    
+    if (camera) {
+        camera.stop();
+        camera = null;
+    }
+    
+    if (video.srcObject) {
+        const stream = video.srcObject;
+        const tracks = stream.getTracks();
+        tracks.forEach(track => track.stop());
+        video.srcObject = null;
+    }
+    
+    video.classList.add('hidden');
+    noseModeBtn.classList.remove('active');
+    noseModeBtn.textContent = 'Nose Mode';
+    
+    canvas.style.pointerEvents = inputEnabled ? 'auto' : 'none';
+}
+
+noseModeBtn.addEventListener('click', startNoseMode);
+
+const originalSetInputEnabled = setInputEnabled;
+setInputEnabled = function(enabled) {
+    originalSetInputEnabled(enabled);
+    if (enabled && !noseModeActive) {
+        startNoseMode();
+    } else if (!enabled && noseModeActive) {
+        stopNoseMode();
+    }
+};
 
 loadCurrentPainting();
 enterIdle();
