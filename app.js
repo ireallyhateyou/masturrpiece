@@ -49,11 +49,16 @@ function updateVideoSize() {
     if (noseModeActive && !video.classList.contains('hidden')) {
         const canvasRect = canvas.getBoundingClientRect();
         const containerRect = canvas.parentElement.getBoundingClientRect();
+        const relativeLeft = canvasRect.left - containerRect.left;
+        const relativeTop = canvasRect.top - containerRect.top;
         
+        video.style.position = 'absolute';
         video.style.width = canvasRect.width + 'px';
         video.style.height = canvasRect.height + 'px';
-        video.style.left = (canvasRect.left - containerRect.left) + 'px';
-        video.style.top = (canvasRect.top - containerRect.top) + 'px';
+        video.style.left = relativeLeft + 'px';
+        video.style.top = relativeTop + 'px';
+        video.style.right = 'auto';
+        video.style.bottom = 'auto';
     }
 }
 
@@ -64,6 +69,22 @@ window.addEventListener('resize', () => {
         setTimeout(updateVideoSize, 100);
     }
 });
+
+function updateNoseCursor(x, y) {
+    if (!noseModeActive || noseCursor.classList.contains('hidden')) return;
+    
+    const canvasRect = canvas.getBoundingClientRect();
+    const containerRect = canvas.parentElement.getBoundingClientRect();
+    
+    const scaleX = canvasRect.width / canvas.width;
+    const scaleY = canvasRect.height / canvas.height;
+    const brushSizeScaled = brushSize * Math.max(scaleX, scaleY);
+    
+    noseCursor.style.left = (canvasRect.left - containerRect.left + x * scaleX) + 'px';
+    noseCursor.style.top = (canvasRect.top - containerRect.top + y * scaleY) + 'px';
+    noseCursor.style.width = brushSizeScaled + 'px';
+    noseCursor.style.height = brushSizeScaled + 'px';
+}
 
 let isDrawing = false;
 let currentTool = 'brush';
@@ -81,6 +102,7 @@ const eraserBtn = document.getElementById('eraserBtn');
 const brushBtn = document.getElementById('brushBtn');
 const noseModeBtn = document.getElementById('noseModeBtn');
 const video = document.getElementById('video');
+const noseCursor = document.getElementById('noseCursor');
 
 colorPicker.addEventListener('change', (e) => {
     currentColor = e.target.value;
@@ -679,6 +701,9 @@ function onFaceMeshResults(results) {
         const canvasX = canvas.width - (smoothedNoseX * canvas.width);
         const canvasY = smoothedNoseY * canvas.height;
         
+        updateNoseCursor(canvasX, canvasY);
+        noseCursor.classList.remove('hidden');
+        
         if (landmarks.length > 234) {
             const leftCheek = landmarks[234];
             const rightCheek = landmarks[454];
@@ -718,6 +743,7 @@ function onFaceMeshResults(results) {
         }
     } else {
         noseDrawing = false;
+        noseCursor.classList.add('hidden');
     }
 }
 
@@ -759,7 +785,9 @@ async function startNoseMode() {
         await video.play();
         video.classList.remove('hidden');
         
-        updateVideoSize();
+        setTimeout(() => {
+            updateVideoSize();
+        }, 100);
         
         camera = new Camera(video, {
             onFrame: async () => {
@@ -810,6 +838,7 @@ function stopNoseMode() {
     }
     
     video.classList.add('hidden');
+    noseCursor.classList.add('hidden');
     noseModeBtn.classList.remove('active');
     noseModeBtn.textContent = 'Nose Mode';
     
