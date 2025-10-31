@@ -1,15 +1,48 @@
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
+let desiredAspectRatio = null; // width / height from current painting
+
+function clamp01(value) {
+    if (!Number.isFinite(value)) return 0;
+    return Math.max(0, Math.min(1, value));
+}
 
 function resizeCanvas() {
     const container = canvas.parentElement;
-    const maxWidth = container.clientWidth - 40;
-    const maxHeight = window.innerHeight - 300;
-    
-    canvas.width = Math.min(800, maxWidth);
-    canvas.height = Math.min(600, maxHeight);
+    const limitWidth = Math.min(800, container.clientWidth - 40);
+    const limitHeight = Math.min(600, window.innerHeight - 300);
+
+    let newWidth = limitWidth;
+    let newHeight = limitHeight;
+
+    if (desiredAspectRatio && desiredAspectRatio > 0) {
+        const containerAspect = limitWidth / limitHeight;
+        if (containerAspect > desiredAspectRatio) {
+            newHeight = limitHeight;
+            newWidth = Math.floor(newHeight * desiredAspectRatio);
+        } else {
+            newWidth = limitWidth;
+            newHeight = Math.floor(newWidth / desiredAspectRatio);
+        }
+    }
+
+    if (newWidth === canvas.width && newHeight === canvas.height) return;
+
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = canvas.width;
+    tempCanvas.height = canvas.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    if (canvas.width && canvas.height) {
+        tempCtx.drawImage(canvas, 0, 0);
+    }
+
+    canvas.width = newWidth;
+    canvas.height = newHeight;
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (tempCanvas.width && tempCanvas.height) {
+        ctx.drawImage(tempCanvas, 0, 0, tempCanvas.width, tempCanvas.height, 0, 0, canvas.width, canvas.height);
+    }
 }
 
 resizeCanvas();
@@ -146,6 +179,7 @@ const referenceWrapper = document.getElementById('referenceWrapper');
 const comparisonSection = document.getElementById('comparisonSection');
 const resultsBar = document.getElementById('resultsBar');
 let monaLisaLoaded = false;
+
 const paintings = [
     { title: 'Mona Lisa', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg/402px-Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg' },
     { title: 'The Starry Night', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Vincent_van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg/480px-Vincent_van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg' },
@@ -165,13 +199,11 @@ function loadCurrentPainting() {
 
 monaLisaImg.onload = () => {
     monaLisaLoaded = true;
-    const canvasAspect = canvas.width / canvas.height;
     const imgAspect = monaLisaImg.naturalWidth / monaLisaImg.naturalHeight;
-    
-    if (Math.abs(canvasAspect - imgAspect) > 0.1) {
-        monaLisaImg.style.width = canvas.width + 'px';
-        monaLisaImg.style.height = 'auto';
-    }
+    desiredAspectRatio = imgAspect;
+    resizeCanvas();
+    monaLisaImg.style.width = canvas.width + 'px';
+    monaLisaImg.style.height = 'auto';
 };
 
 function getImageDataFromCanvas(sourceCanvas, width, height) {
@@ -265,6 +297,7 @@ function compareImages(drawingData, referenceData, width, height) {
         referenceBrightnessSq += rLum * rLum;
         crossSum += dLum * rLum;
     }
+    
     scores.colorSimilarity = 1 - (colorDiff / totalPixels);
     scores.luminanceSimilarity = 1 - (luminanceDiff / totalPixels);
     scores.edgeSimilarity = 1 - (edgeDiff / totalPixels);
@@ -275,11 +308,11 @@ function compareImages(drawingData, referenceData, width, height) {
     const referenceVar = (referenceBrightnessSq / totalPixels) - (referenceMean * referenceMean);
     const covariance = (crossSum / totalPixels) - (drawingMean * referenceMean);
     
-    const c1 = 0.01 * 255;
-    const c2 = 0.03 * 255;
+    const c1 = 0.05 * 255;
+    const c2 = 0.15 * 255;
     const numerator = (2 * drawingMean * referenceMean + c1) * (2 * covariance + c2);
     const denominator = (drawingMean * drawingMean + referenceMean * referenceMean + c1) * (drawingVar + referenceVar + c2);
-    scores.structuralSimilarity = numerator / denominator;
+    scores.structuralSimilarity = clamp01(numerator / denominator);
     
     return scores;
 }
@@ -309,16 +342,18 @@ function compareWithMonaLisa() {
         return null;
     }
     comparisonResult.textContent = 'Analyzing...';
-    const comparisonSize = 64;
+    const comparisonSize = 32;
     const drawingData = getImageDataFromCanvas(canvas, comparisonSize, comparisonSize);
     const referenceData = getImageDataFromImage(monaLisaImg, comparisonSize, comparisonSize);
     const scores = compareImages(drawingData, referenceData, comparisonSize, comparisonSize);
     // Weighted average emphasizes structure and edges
-    const overallSimilarity = (0.15 * scores.colorSimilarity) + 
-                    (0.25 * scores.luminanceSimilarity) + 
-                    (0.25 * scores.edgeSimilarity) + 
-                    (0.35 * scores.structuralSimilarity);
-    const similarityPercent = Math.round(overallSimilarity * 100);
+    const overallSimilarity = clamp01((0.35 * scores.colorSimilarity) + 
+                    (0.45 * scores.luminanceSimilarity) + 
+                    (0.10 * scores.edgeSimilarity) + 
+                    (0.10 * scores.structuralSimilarity));
+    const eased = 1 - Math.pow(1 - overallSimilarity, 0.5);
+    const displaySimilarity = clamp01(eased + 0.05);
+    const similarityPercent = Math.round(displaySimilarity * 100);
     let message = `Similarity: ${similarityPercent}%`;
     if (similarityPercent >= 80) {
         message += ' - Masterpiece!';
