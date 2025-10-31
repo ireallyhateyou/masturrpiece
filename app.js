@@ -78,7 +78,7 @@ function updateNoseCursor(x, y) {
     
     const scaleX = canvasRect.width / canvas.width;
     const scaleY = canvasRect.height / canvas.height;
-    const brushSizeScaled = brushSize * Math.max(scaleX, scaleY);
+    const brushSizeScaled = brushSize * Math.max(scaleX, scaleY) * 1.5;
     
     noseCursor.style.left = (canvasRect.left - containerRect.left + x * scaleX) + 'px';
     noseCursor.style.top = (canvasRect.top - containerRect.top + y * scaleY) + 'px';
@@ -100,7 +100,6 @@ const brushSizeValue = document.getElementById('brushSizeValue');
 const clearBtn = document.getElementById('clearBtn');
 const eraserBtn = document.getElementById('eraserBtn');
 const brushBtn = document.getElementById('brushBtn');
-const noseModeBtn = document.getElementById('noseModeBtn');
 const video = document.getElementById('video');
 const noseCursor = document.getElementById('noseCursor');
 
@@ -108,6 +107,7 @@ colorPicker.addEventListener('change', (e) => {
     currentColor = e.target.value;
     if (currentTool === 'brush') {
         ctx.strokeStyle = currentColor;
+        ctx.fillStyle = currentColor;
     }
 });
 
@@ -135,6 +135,7 @@ brushBtn.addEventListener('click', () => {
     brushBtn.classList.add('active');
     eraserBtn.classList.remove('active');
     ctx.strokeStyle = currentColor;
+    ctx.fillStyle = currentColor;
     ctx.globalCompositeOperation = 'source-over';
 });
 
@@ -155,9 +156,8 @@ function draw(e) {
     const currentY = e.clientY - rect.top;
     
     ctx.beginPath();
-    ctx.moveTo(lastX, lastY);
-    ctx.lineTo(currentX, currentY);
-    ctx.stroke();
+    ctx.arc(currentX, currentY, ctx.lineWidth / 2, 0, Math.PI * 2);
+    ctx.fill();
     
     lastX = currentX;
     lastY = currentY;
@@ -204,6 +204,7 @@ ctx.lineCap = 'round';
 ctx.lineJoin = 'round';
 ctx.lineWidth = brushSize;
 ctx.strokeStyle = currentColor;
+ctx.fillStyle = currentColor;
 
 const monaLisaImg = document.getElementById('monaLisaImg');
 const compareBtn = document.getElementById('compareBtn');
@@ -381,6 +382,22 @@ function detectEdges(imageData, width, height) {
     return edges;
 }
 
+function getLetterGrade(percent) {
+    if (percent >= 97) return 'A+';
+    if (percent >= 93) return 'A';
+    if (percent >= 90) return 'A-';
+    if (percent >= 87) return 'B+';
+    if (percent >= 83) return 'B';
+    if (percent >= 80) return 'B-';
+    if (percent >= 77) return 'C+';
+    if (percent >= 73) return 'C';
+    if (percent >= 70) return 'C-';
+    if (percent >= 67) return 'D+';
+    if (percent >= 63) return 'D';
+    if (percent >= 60) return 'D-';
+    return 'F';
+}
+
 function compareWithMonaLisa() {
     if (!monaLisaLoaded) {
         comparisonResult.textContent = 'Loading Mona Lisa...';
@@ -391,7 +408,6 @@ function compareWithMonaLisa() {
     const drawingData = getImageDataFromCanvas(canvas, comparisonSize, comparisonSize);
     const referenceData = getImageDataFromImage(monaLisaImg, comparisonSize, comparisonSize);
     const scores = compareImages(drawingData, referenceData, comparisonSize, comparisonSize);
-    // Weighted average emphasizes structure and edges
     const overallSimilarity = clamp01((0.35 * scores.colorSimilarity) + 
                     (0.45 * scores.luminanceSimilarity) + 
                     (0.10 * scores.edgeSimilarity) + 
@@ -399,23 +415,14 @@ function compareWithMonaLisa() {
     const eased = 1 - Math.pow(1 - overallSimilarity, 0.5);
     const displaySimilarity = clamp01(eased + 0.05);
     const similarityPercent = Math.round(displaySimilarity * 100);
-    let message = `Similarity: ${similarityPercent}%`;
-    if (similarityPercent >= 80) {
-        message += ' - Masterpiece!';
-    } else if (similarityPercent >= 60) {
-        message += ' - Impressive!';
-    } else if (similarityPercent >= 40) {
-        message += ' - Not bad!';
-    } else if (similarityPercent >= 20) {
-        message += ' - Keep trying!';
-    } else {
-        message += ' - Abstract art!';
-    }
+    const letterGrade = getLetterGrade(similarityPercent);
+    
+    const message = `Grade: ${letterGrade}`;
     comparisonResult.innerHTML = `${message}<br>` +
         `<small style="color: #666;">Color: ${Math.round(scores.colorSimilarity * 100)}% | ` +
         `Structure: ${Math.round(scores.structuralSimilarity * 100)}% | ` +
         `Edges: ${Math.round(scores.edgeSimilarity * 100)}%</small>`;
-    return similarityPercent;
+    return letterGrade;
 }
 
 compareBtn.addEventListener('click', compareWithMonaLisa);
@@ -589,8 +596,8 @@ function finishGame() {
     countdownLabel.textContent = '';
     updateTimerBar(1);
     toolsBar.classList.add('hidden');
-    const similarity = compareWithMonaLisa();
-    if (similarity !== null && similarity >= 50) {
+    const grade = compareWithMonaLisa();
+    if (grade !== null) {
         phaseLabel.textContent = 'Round cleared!';
         setTimeout(() => {
             currentPaintingIndex = (currentPaintingIndex + 1) % paintings.length;
@@ -733,9 +740,8 @@ function onFaceMeshResults(results) {
                 const constrainedY = Math.max(0, Math.min(canvas.height, canvasY));
                 
                 ctx.beginPath();
-                ctx.moveTo(lastNoseX, lastNoseY);
-                ctx.lineTo(constrainedX, constrainedY);
-                ctx.stroke();
+                ctx.arc(constrainedX, constrainedY, ctx.lineWidth / 2, 0, Math.PI * 2);
+                ctx.fill();
                 
                 lastNoseX = constrainedX;
                 lastNoseY = constrainedY;
@@ -749,13 +755,15 @@ function onFaceMeshResults(results) {
 
 async function startNoseMode() {
     if (noseModeActive) {
-        stopNoseMode();
         return;
     }
+    
+    noseModeActive = true;
     
     try {
         if (typeof FaceMesh === 'undefined' || typeof Camera === 'undefined') {
             alert('MediaPipe libraries are loading. Please wait a moment and try again.');
+            noseModeActive = false;
             return;
         }
         
@@ -799,11 +807,6 @@ async function startNoseMode() {
             height: camHeight
         });
         camera.start();
-        
-        noseModeActive = true;
-        noseModeBtn.classList.add('active');
-        noseModeBtn.textContent = 'Stop Nose Mode';
-        
         canvas.style.pointerEvents = 'none';
         
         noseDrawing = false;
@@ -812,6 +815,7 @@ async function startNoseMode() {
         lastNoseX = 0;
         lastNoseY = 0;
     } catch (err) {
+        noseModeActive = false;
         console.error('Error accessing camera:', err);
         if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
             alert('Camera access denied. Please allow camera permissions in your browser settings and try again.');
@@ -839,19 +843,20 @@ function stopNoseMode() {
     
     video.classList.add('hidden');
     noseCursor.classList.add('hidden');
-    noseModeBtn.classList.remove('active');
-    noseModeBtn.textContent = 'Nose Mode';
     
     canvas.style.pointerEvents = inputEnabled ? 'auto' : 'none';
 }
 
-noseModeBtn.addEventListener('click', startNoseMode);
 
 const originalSetInputEnabled = setInputEnabled;
+let autoStartingNoseMode = false;
 setInputEnabled = function(enabled) {
     originalSetInputEnabled(enabled);
-    if (enabled && !noseModeActive) {
-        startNoseMode();
+    if (enabled && !noseModeActive && !autoStartingNoseMode) {
+        autoStartingNoseMode = true;
+        startNoseMode().finally(() => {
+            autoStartingNoseMode = false;
+        });
     } else if (!enabled && noseModeActive) {
         stopNoseMode();
     }
