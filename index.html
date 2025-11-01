@@ -14,13 +14,11 @@
                 <label for="colorPicker">Color:</label>
                 <input type="color" id="colorPicker" value="#000000">
             </div>
-            
             <div class="tool-group">
                 <label for="brushSize">Brush Size:</label>
                 <input type="range" id="brushSize" min="1" max="50" value="5">
                 <span id="brushSizeValue">5</span>
             </div>
-            
             <div class="tool-group">
                 <button id="clearBtn" class="btn">Clear Canvas</button>
                 <button id="eraserBtn" class="btn">Eraser</button>
@@ -53,15 +51,15 @@
                 </div>
             </div>
             <div class="reference-wrapper hidden" id="referenceWrapper">
-                <h3 id="referenceTitle">Mona Lisa</h3>
+                <h3 id="referenceTitle">Reference</h3>
                 <div class="reference-container">
-                    <img id="monaLisaImg" class="hidden" alt="Mona Lisa" crossorigin="anonymous">
+                    <img id="monaLisaImg" class="hidden" alt="Reference Painting" crossorigin="anonymous">
                 </div>
             </div>
         </div>
         
         <div class="toolbar" id="resultsBar" style="margin-top: 20px;">
-            <button id="compareBtn" class="btn">Compare with Mona Lisa</button>
+            <button id="compareBtn" class="btn">Compare with Reference</button>
             <div id="comparisonResult" class="comparison-result"></div>
         </div>
     </div>

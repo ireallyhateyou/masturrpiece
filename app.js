@@ -78,7 +78,7 @@ function updateNoseCursor(x, y) {
     
     const scaleX = canvasRect.width / canvas.width;
     const scaleY = canvasRect.height / canvas.height;
-    const brushSizeScaled = brushSize * Math.max(scaleX, scaleY) * 1.5;
+    const brushSizeScaled = brushSize * Math.max(scaleX, scaleY) * 2.5;
     
     noseCursor.style.left = (canvasRect.left - containerRect.left + x * scaleX) + 'px';
     noseCursor.style.top = (canvasRect.top - containerRect.top + y * scaleY) + 'px';
@@ -144,20 +144,33 @@ function startDrawing(e) {
     startTimer();
     isDrawing = true;
     const rect = canvas.getBoundingClientRect();
-    lastX = e.clientX - rect.left;
-    lastY = e.clientY - rect.top;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    lastX = (e.clientX - rect.left) * scaleX;
+    lastY = (e.clientY - rect.top) * scaleY;
 }
 
 function draw(e) {
     if (!isDrawing) return;
     
     const rect = canvas.getBoundingClientRect();
-    const currentX = e.clientX - rect.left;
-    const currentY = e.clientY - rect.top;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const currentX = (e.clientX - rect.left) * scaleX;
+    const currentY = (e.clientY - rect.top) * scaleY;
     
+    const radius = ctx.lineWidth / 2;
     ctx.beginPath();
-    ctx.arc(currentX, currentY, ctx.lineWidth / 2, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.arc(currentX, currentY, radius, 0, Math.PI * 2);
+    
+    if (currentTool === 'eraser') {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = currentColor;
+    } else {
+        ctx.fill();
+    }
     
     lastX = currentX;
     lastY = currentY;
@@ -206,7 +219,7 @@ ctx.lineWidth = brushSize;
 ctx.strokeStyle = currentColor;
 ctx.fillStyle = currentColor;
 
-const monaLisaImg = document.getElementById('monaLisaImg');
+const paintingImg = document.getElementById('monaLisaImg');
 const compareBtn = document.getElementById('compareBtn');
 const comparisonResult = document.getElementById('comparisonResult');
 const gameBar = document.getElementById('gameBar');
@@ -221,7 +234,8 @@ const referenceTitle = document.getElementById('referenceTitle');
 const referenceWrapper = document.getElementById('referenceWrapper');
 const comparisonSection = document.getElementById('comparisonSection');
 const resultsBar = document.getElementById('resultsBar');
-let monaLisaLoaded = false;
+
+let paintingLoaded = false;
 
 const paintings = [
     { title: 'Mona Lisa', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg/402px-Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg' },
@@ -232,21 +246,21 @@ const paintings = [
 let currentPaintingIndex = 0;
 
 function loadCurrentPainting() {
-    monaLisaLoaded = false;
+    paintingLoaded = false;
     const { title, src } = paintings[currentPaintingIndex];
     referenceTitle.textContent = title;
-    monaLisaImg.style.width = '';
-    monaLisaImg.style.height = '';
-    monaLisaImg.src = src;
+    paintingImg.style.width = '';
+    paintingImg.style.height = '';
+    paintingImg.src = src;
 }
 
-monaLisaImg.onload = () => {
-    monaLisaLoaded = true;
-    const imgAspect = monaLisaImg.naturalWidth / monaLisaImg.naturalHeight;
+paintingImg.onload = () => {
+    paintingLoaded = true;
+    const imgAspect = paintingImg.naturalWidth / paintingImg.naturalHeight;
     desiredAspectRatio = imgAspect;
     resizeCanvas();
-    monaLisaImg.style.width = canvas.width + 'px';
-    monaLisaImg.style.height = 'auto';
+    paintingImg.style.width = canvas.width + 'px';
+    paintingImg.style.height = 'auto';
     if (noseModeActive) {
         setTimeout(updateVideoSize, 100);
     }
@@ -347,7 +361,7 @@ function compareImages(drawingData, referenceData, width, height) {
     scores.colorSimilarity = 1 - (colorDiff / totalPixels);
     scores.luminanceSimilarity = 1 - (luminanceDiff / totalPixels);
     scores.edgeSimilarity = 1 - (edgeDiff / totalPixels);
-    // SSIM-like metric for structure
+    // SSIM metric for structure
     const drawingMean = drawingBrightnessSum / totalPixels;
     const referenceMean = referenceBrightnessSum / totalPixels;
     const drawingVar = (drawingBrightnessSq / totalPixels) - (drawingMean * drawingMean);
@@ -398,15 +412,15 @@ function getLetterGrade(percent) {
     return 'F';
 }
 
-function compareWithMonaLisa() {
-    if (!monaLisaLoaded) {
-        comparisonResult.textContent = 'Loading Mona Lisa...';
+function compareWithPainting() {
+    if (!paintingLoaded) {
+        comparisonResult.textContent = 'Loading painting...';
         return null;
     }
     comparisonResult.textContent = 'Analyzing...';
     const comparisonSize = 32;
     const drawingData = getImageDataFromCanvas(canvas, comparisonSize, comparisonSize);
-    const referenceData = getImageDataFromImage(monaLisaImg, comparisonSize, comparisonSize);
+    const referenceData = getImageDataFromImage(paintingImg, comparisonSize, comparisonSize);
     const scores = compareImages(drawingData, referenceData, comparisonSize, comparisonSize);
     const overallSimilarity = clamp01((0.35 * scores.colorSimilarity) + 
                     (0.45 * scores.luminanceSimilarity) + 
@@ -425,7 +439,7 @@ function compareWithMonaLisa() {
     return letterGrade;
 }
 
-compareBtn.addEventListener('click', compareWithMonaLisa);
+compareBtn.addEventListener('click', compareWithPainting);
 
 let gameActive = false;
 let isPeeking = false;
@@ -456,7 +470,7 @@ function updateTimerBar(progress) {
 }
 
 function showReference(show) {
-    monaLisaImg.classList.toggle('hidden', !show);
+    paintingImg.classList.toggle('hidden', !show);
     referenceWrapper.classList.toggle('hidden', !show);
     comparisonSection.classList.toggle('single', !show);
 }
@@ -473,7 +487,7 @@ function enterIdle() {
     gameBar.classList.remove('hidden');
     toolsBar.classList.add('hidden');
     compareBtn.classList.remove('hidden');
-    referenceTitle.textContent = 'Mona Lisa';
+    referenceTitle.textContent = paintings[currentPaintingIndex]?.title || 'Reference';
     setResultsBarVisible(false);
 }
 
@@ -596,7 +610,7 @@ function finishGame() {
     countdownLabel.textContent = '';
     updateTimerBar(1);
     toolsBar.classList.add('hidden');
-    const grade = compareWithMonaLisa();
+    const grade = compareWithPainting();
     if (grade !== null) {
         phaseLabel.textContent = 'Round cleared!';
         setTimeout(() => {
@@ -605,7 +619,7 @@ function finishGame() {
             phaseLabel.textContent = 'Loading next...';
             loadCurrentPainting();
             const waitForLoad = setInterval(() => {
-                if (monaLisaLoaded) {
+                if (paintingLoaded) {
                     clearInterval(waitForLoad);
                     startGameBtn.disabled = true;
                     startGameBtn.textContent = 'Running...';
@@ -622,7 +636,7 @@ function finishGame() {
 }
 
 startGameBtn.addEventListener('click', () => {
-    if (!monaLisaLoaded) {
+    if (!paintingLoaded) {
         phaseLabel.textContent = 'Loading reference...';
         return;
     }
@@ -659,9 +673,10 @@ function initializeFaceMesh() {
     
     faceMesh.setOptions({
         maxNumFaces: 1,
-        refineLandmarks: true,
+        refineLandmarks: false,
         minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5
+        minTrackingConfidence: 0.5,
+        selfieMode: true
     });
     
     faceMesh.onResults(onFaceMeshResults);
@@ -741,7 +756,15 @@ function onFaceMeshResults(results) {
                 
                 ctx.beginPath();
                 ctx.arc(constrainedX, constrainedY, ctx.lineWidth / 2, 0, Math.PI * 2);
-                ctx.fill();
+                
+                if (currentTool === 'eraser') {
+                    ctx.globalCompositeOperation = 'destination-out';
+                    ctx.fill();
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.fillStyle = currentColor;
+                } else {
+                    ctx.fill();
+                }
                 
                 lastNoseX = constrainedX;
                 lastNoseY = constrainedY;
