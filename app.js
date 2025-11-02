@@ -487,7 +487,7 @@ function enterIdle() {
     gameActive = false;
     isPeeking = false;
     setInputEnabled(false);
-    showReference(true);
+    showReference(false);
     gameBar.classList.remove('hidden');
     toolsBar.classList.add('hidden');
     referenceTitle.textContent = paintings[currentPaintingIndex]?.title || 'Reference';
@@ -658,6 +658,7 @@ let lastNoseY = 0;
 let noseDrawing = false;
 let smoothedNoseX = 0;
 let smoothedNoseY = 0;
+let firstNoseDetection = true;
 const SMOOTHING_FACTOR = 0.3;
 const MIN_DISTANCE_THRESHOLD = 0.05;
 
@@ -857,13 +858,25 @@ function onFaceMeshResults(results) {
 
         mappedX = Math.max(0, Math.min(1, mappedX));
         mappedY = Math.max(0, Math.min(1, mappedY));
-        smoothedNoseX = smoothedNoseX + SMOOTHING_FACTOR * (mappedX - smoothedNoseX);
-        smoothedNoseY = smoothedNoseY + SMOOTHING_FACTOR * (mappedY - smoothedNoseY);
+        
+        if (firstNoseDetection) {
+            smoothedNoseX = mappedX;
+            smoothedNoseY = mappedY;
+            firstNoseDetection = false;
+        } else {
+            smoothedNoseX = smoothedNoseX + SMOOTHING_FACTOR * (mappedX - smoothedNoseX);
+            smoothedNoseY = smoothedNoseY + SMOOTHING_FACTOR * (mappedY - smoothedNoseY);
+        }
+        
         const canvasX = smoothedNoseX * canvas.width;
         const canvasY = smoothedNoseY * canvas.height;
 
-        updateNoseCursor(canvasX, canvasY);
-        noseCursor.classList.remove('hidden');
+        if (noseDrawing) {
+            updateNoseCursor(canvasX, canvasY);
+            noseCursor.classList.remove('hidden');
+        } else {
+            noseCursor.classList.add('hidden');
+        }
 
         if (landmarks.length > 454) {
             const leftCheek = landmarks[234];
@@ -989,6 +1002,7 @@ async function startNoseMode() {
         smoothedNoseY = 0;
         lastNoseX = 0;
         lastNoseY = 0;
+        firstNoseDetection = true;
     } catch (err) {
         noseModeActive = false;
         console.error('Error accessing camera:', err);
