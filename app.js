@@ -2,7 +2,7 @@ const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 let desiredAspectRatio = null; // width / height from current painting
 
-function clamp01(value) {
+function clampZeroToOne(value) {
     if (!Number.isFinite(value)) return 0;
     return Math.max(0, Math.min(1, value));
 }
@@ -51,7 +51,7 @@ function updateVideoSize() {
         const containerRect = canvas.parentElement.getBoundingClientRect();
         const relativeLeft = canvasRect.left - containerRect.left;
         const relativeTop = canvasRect.top - containerRect.top;
-        
+
         video.style.position = 'absolute';
         video.style.width = canvasRect.width + 'px';
         video.style.height = canvasRect.height + 'px';
@@ -72,14 +72,14 @@ window.addEventListener('resize', () => {
 
 function updateNoseCursor(x, y) {
     if (!noseModeActive || noseCursor.classList.contains('hidden')) return;
-    
+
     const canvasRect = canvas.getBoundingClientRect();
     const containerRect = canvas.parentElement.getBoundingClientRect();
-    
+
     const scaleX = canvasRect.width / canvas.width;
     const scaleY = canvasRect.height / canvas.height;
     const brushSizeScaled = brushSize * Math.max(scaleX, scaleY) * 2.5;
-    
+
     noseCursor.style.left = (canvasRect.left - containerRect.left + x * scaleX) + 'px';
     noseCursor.style.top = (canvasRect.top - containerRect.top + y * scaleY) + 'px';
     noseCursor.style.width = brushSizeScaled + 'px';
@@ -372,7 +372,7 @@ function compareImages(drawingData, referenceData, width, height) {
     const c2 = 0.15 * 255;
     const numerator = (2 * drawingMean * referenceMean + c1) * (2 * covariance + c2);
     const denominator = (drawingMean * drawingMean + referenceMean * referenceMean + c1) * (drawingVar + referenceVar + c2);
-    scores.structuralSimilarity = clamp01(numerator / denominator);
+    scores.structuralSimilarity = clampZeroToOne(numerator / denominator);
     
     return scores;
 }
@@ -422,12 +422,12 @@ function compareWithPainting() {
     const drawingData = getImageDataFromCanvas(canvas, comparisonSize, comparisonSize);
     const referenceData = getImageDataFromImage(paintingImg, comparisonSize, comparisonSize);
     const scores = compareImages(drawingData, referenceData, comparisonSize, comparisonSize);
-    const overallSimilarity = clamp01((0.35 * scores.colorSimilarity) + 
+    const overallSimilarity = clampZeroToOne((0.35 * scores.colorSimilarity) + 
                     (0.45 * scores.luminanceSimilarity) + 
                     (0.10 * scores.edgeSimilarity) + 
                     (0.10 * scores.structuralSimilarity));
     const eased = 1 - Math.pow(1 - overallSimilarity, 0.5);
-    const displaySimilarity = clamp01(eased + 0.05);
+    const displaySimilarity = clampZeroToOne(eased + 0.05);
     const similarityPercent = Math.round(displaySimilarity * 100);
     const letterGrade = getLetterGrade(similarityPercent);
     

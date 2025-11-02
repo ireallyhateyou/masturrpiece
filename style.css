@@ -226,36 +226,36 @@ h1 {
         flex-direction: column;
         align-items: stretch;
     }
-    
+
     .tool-group {
         justify-content: space-between;
     }
-    
+
     .gamebar {
         flex-direction: column;
         gap: 10px;
     }
-    
+
     .gamebar .tool-group:last-child {
         flex-direction: row;
         align-items: center;
         gap: 10px;
         width: 100%;
     }
-    
+
     .gamebar .timer {
         flex: 1;
     }
-    
+
     .comparison-section {
         grid-template-columns: 1fr;
     }
-    
+
     #canvas, #monaLisaImg {
         max-width: 100%;
         height: auto;
     }
-    
+
     .comparison-result {
         margin-left: 0;
         margin-top: 10px;
