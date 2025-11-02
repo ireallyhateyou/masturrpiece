@@ -220,7 +220,6 @@ ctx.strokeStyle = currentColor;
 ctx.fillStyle = currentColor;
 
 const paintingImg = document.getElementById('monaLisaImg');
-const compareBtn = document.getElementById('compareBtn');
 const comparisonResult = document.getElementById('comparisonResult');
 const gameBar = document.getElementById('gameBar');
 const toolsBar = document.getElementById('toolsBar');
@@ -236,6 +235,7 @@ const comparisonSection = document.getElementById('comparisonSection');
 const resultsBar = document.getElementById('resultsBar');
 
 let paintingLoaded = false;
+let noseModeActive = false;
 
 const paintings = [
     { title: 'Mona Lisa', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg/402px-Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg' },
@@ -261,6 +261,7 @@ paintingImg.onload = () => {
     resizeCanvas();
     paintingImg.style.width = canvas.width + 'px';
     paintingImg.style.height = 'auto';
+    paintingImg.classList.remove('hidden');
     if (noseModeActive) {
         setTimeout(updateVideoSize, 100);
     }
@@ -439,7 +440,6 @@ function compareWithPainting() {
     return letterGrade;
 }
 
-compareBtn.addEventListener('click', compareWithPainting);
 
 let gameActive = false;
 let isPeeking = false;
@@ -483,10 +483,9 @@ function enterIdle() {
     gameActive = false;
     isPeeking = false;
     setInputEnabled(false);
-    showReference(false);
+    showReference(true);
     gameBar.classList.remove('hidden');
     toolsBar.classList.add('hidden');
-    compareBtn.classList.remove('hidden');
     referenceTitle.textContent = paintings[currentPaintingIndex]?.title || 'Reference';
     setResultsBarVisible(false);
 }
@@ -501,7 +500,6 @@ function enterGameReady() {
     updateTimerBar(0);
     showReference(false);
     gameBar.classList.remove('hidden');
-    compareBtn.classList.add('hidden');
     referenceTitle.textContent = 'Reference (Hidden)';
     setResultsBarVisible(false);
     peekBtn.disabled = true;
@@ -648,8 +646,6 @@ startGameBtn.addEventListener('click', () => {
 
 peekBtn.addEventListener('click', doPeek);
 finishBtn.addEventListener('click', finishGame);
-
-let noseModeActive = false;
 let faceMesh = null;
 let camera = null;
 let lastNoseX = 0;
@@ -667,6 +663,9 @@ function initializeFaceMesh() {
     
     faceMesh = new FaceMesh({
         locateFile: (file) => {
+            if (file.includes('face_detection_short_range')) {
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`;
+            }
             return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
         }
     });
@@ -720,7 +719,7 @@ function onFaceMeshResults(results) {
         smoothedNoseX = smoothedNoseX + SMOOTHING_FACTOR * (mappedX - smoothedNoseX);
         smoothedNoseY = smoothedNoseY + SMOOTHING_FACTOR * (mappedY - smoothedNoseY);
         
-        const canvasX = canvas.width - (smoothedNoseX * canvas.width);
+        const canvasX = smoothedNoseX * canvas.width;
         const canvasY = smoothedNoseY * canvas.height;
         
         updateNoseCursor(canvasX, canvasY);
@@ -731,7 +730,10 @@ function onFaceMeshResults(results) {
             const rightCheek = landmarks[454];
             const faceWidth = Math.abs(leftCheek.x - rightCheek.x);
             const distanceFactor = Math.min(Math.max(faceWidth * 50, 0.5), 2);
-            ctx.lineWidth = brushSize * distanceFactor;
+            const brushSizeScaled = brushSize * distanceFactor;
+            ctx.lineWidth = brushSizeScaled;
+        } else {
+            ctx.lineWidth = brushSize;
         }
         
         const distance = Math.sqrt(
@@ -759,11 +761,12 @@ function onFaceMeshResults(results) {
                 
                 if (currentTool === 'eraser') {
                     ctx.globalCompositeOperation = 'destination-out';
-                    ctx.fill();
-                    ctx.globalCompositeOperation = 'source-over';
-                    ctx.fillStyle = currentColor;
                 } else {
-                    ctx.fill();
+                    ctx.fillStyle = currentColor;
+                }
+                ctx.fill();
+                if (currentTool === 'eraser') {
+                    ctx.globalCompositeOperation = 'source-over';
                 }
                 
                 lastNoseX = constrainedX;
