@@ -646,6 +646,7 @@ startGameBtn.addEventListener('click', () => {
 
 peekBtn.addEventListener('click', doPeek);
 finishBtn.addEventListener('click', finishGame);
+
 let faceMesh = null;
 let camera = null;
 let lastNoseX = 0;
@@ -655,6 +656,84 @@ let smoothedNoseX = 0;
 let smoothedNoseY = 0;
 const SMOOTHING_FACTOR = 0.3;
 const MIN_DISTANCE_THRESHOLD = 0.05;
+
+let hands = null;
+let lastHandRaiseTime = 0;
+const HAND_RAISE_COOLDOWN = 800;
+let handWasRaised = false;
+
+function generateRandomColor() {
+    const colors = [
+        '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF',
+        '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F',
+        '#BB8FCE', '#85C1E2', '#F8B739', '#E74C3C', '#9B59B6', '#3498DB'
+    ];
+    return colors[Math.floor(Math.random() * colors.length)];
+}
+
+function changeColorOnHandRaise() {
+    const now = Date.now();
+    if (now - lastHandRaiseTime < HAND_RAISE_COOLDOWN) return;
+    
+    lastHandRaiseTime = now;
+    currentColor = generateRandomColor();
+    
+    if (colorPicker) {
+        colorPicker.value = currentColor;
+    }
+    
+    if (currentTool === 'brush') {
+        ctx.strokeStyle = currentColor;
+        ctx.fillStyle = currentColor;
+    }
+}
+
+function onHandResults(results) {
+    if (!noseModeActive || !inputEnabled) return;
+    
+    const handRaisedThreshold = 0.4;
+    
+    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        for (const landmarks of results.multiHandLandmarks) {
+            const wristY = landmarks[0].y;
+            const indexFingerTipY = landmarks[8].y;
+            const middleFingerTipY = landmarks[12].y;
+            
+            const minFingerY = Math.min(indexFingerTipY, middleFingerTipY);
+            const handRaised = minFingerY < wristY - 0.1;
+            
+            if (handRaised && !handWasRaised) {
+                changeColorOnHandRaise();
+                handWasRaised = true;
+            } else if (!handRaised) {
+                handWasRaised = false;
+            }
+        }
+    } else {
+        handWasRaised = false;
+    }
+}
+
+function initializeHands() {
+    if (typeof Hands === 'undefined') {
+        return;
+    }
+    
+    hands = new Hands({
+        locateFile: (file) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+        }
+    });
+    
+    hands.setOptions({
+        maxNumHands: 2,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+    });
+    
+    hands.onResults(onHandResults);
+}
 
 function initializeFaceMesh() {
     if (typeof FaceMesh === 'undefined') {
@@ -725,13 +804,14 @@ function onFaceMeshResults(results) {
         updateNoseCursor(canvasX, canvasY);
         noseCursor.classList.remove('hidden');
         
-        if (landmarks.length > 234) {
+        if (landmarks.length > 454) {
             const leftCheek = landmarks[234];
             const rightCheek = landmarks[454];
             const faceWidth = Math.abs(leftCheek.x - rightCheek.x);
             const distanceFactor = Math.min(Math.max(faceWidth * 50, 0.5), 2);
             const brushSizeScaled = brushSize * distanceFactor;
             ctx.lineWidth = brushSizeScaled;
+            
         } else {
             ctx.lineWidth = brushSize;
         }
@@ -797,6 +877,10 @@ async function startNoseMode() {
             initializeFaceMesh();
         }
         
+        if (!hands) {
+            initializeHands();
+        }
+        
         const canvasAspect = canvas.width / canvas.height;
         let camWidth = 640;
         let camHeight = 480;
@@ -825,8 +909,13 @@ async function startNoseMode() {
         
         camera = new Camera(video, {
             onFrame: async () => {
-                if (faceMesh && noseModeActive) {
-                    await faceMesh.send({ image: video });
+                if (noseModeActive) {
+                    if (faceMesh) {
+                        await faceMesh.send({ image: video });
+                    }
+                    if (hands) {
+                        await hands.send({ image: video });
+                    }
                 }
             },
             width: camWidth,
