@@ -4,11 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>masturrpiece</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Luxurious+Script&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
+    <div class="story-modal" id="storyModal">
+        <div class="story-content">
+            <div class="story-text">
+                <h2 class="story-title" id="storyTitle"></h2>
+                <p class="story-paragraph" id="storyParagraph"></p>
+            </div>
+            <button class="btn story-btn hidden" id="storyNextBtn">Next</button>
+        </div>
+    </div>
+    
+    <div class="container" id="container">
         <h1 class="app-title">masturrpiece</h1>
+        <p class="subtitle">face paint your chef d'oeuvres, from memory!</p>
+        
         <div class="toolbar hidden" id="toolsBar">
             <div class="tool-group">
                 <label for="colorPicker">Color:</label>

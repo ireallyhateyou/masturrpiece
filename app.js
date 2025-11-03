@@ -1,6 +1,6 @@
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-let desiredAspectRatio = null; // width / height from current painting
+let desiredAspectRatio = null;
 
 function clampZeroToOne(value) {
     if (!Number.isFinite(value)) return 0;
@@ -11,7 +11,6 @@ function resizeCanvas() {
     const container = canvas.parentElement;
     const limitWidth = Math.min(800, container.clientWidth - 40);
     const limitHeight = Math.min(600, window.innerHeight - 300);
-
     let newWidth = limitWidth;
     let newHeight = limitHeight;
 
@@ -158,8 +157,8 @@ function draw(e) {
     const scaleY = canvas.height / rect.height;
     const currentX = (e.clientX - rect.left) * scaleX;
     const currentY = (e.clientY - rect.top) * scaleY;
-
     const radius = ctx.lineWidth / 2;
+
     ctx.beginPath();
     ctx.arc(currentX, currentY, radius, 0, Math.PI * 2);
 
@@ -367,7 +366,6 @@ function compareImages(drawingData, referenceData, width, height) {
     scores.colorSimilarity = 1 - (colorDiff / totalPixels);
     scores.luminanceSimilarity = 1 - (luminanceDiff / totalPixels);
     scores.edgeSimilarity = 1 - (edgeDiff / totalPixels);
-    // SSIM metric for structure
     const drawingMean = drawingBrightnessSum / totalPixels;
     const referenceMean = referenceBrightnessSum / totalPixels;
     const drawingVar = (drawingBrightnessSq / totalPixels) - (drawingMean * drawingMean);
@@ -1050,6 +1048,108 @@ setInputEnabled = function(enabled) {
         stopNoseMode();
     }
 };
+
+const storyModal = document.getElementById('storyModal');
+const storyNextBtn = document.getElementById('storyNextBtn');
+const storyTitle = document.getElementById('storyTitle');
+const storyParagraph = document.getElementById('storyParagraph');
+
+const dialogueScript = [
+    { title: 'The Great Museum Heist', text: 'Our museum was robbed!' },
+    { title: '', text: 'While we\'re figuring out how to recover our jewels...' },
+    { title: '', text: '...you will be forced to make our masterpieces!' },
+    { title: '', text: 'Begin your quest, brave artist!' }
+];
+
+let currentDialogueIndex = 0;
+let isTyping = false;
+let typewriterSpeed = 30;
+let activeTypewriters = [];
+
+function typeWriter(element, text, callback) {
+    element.textContent = '';
+    element.classList.remove('complete');
+    storyNextBtn.classList.add('hidden');
+    let charIndex = 0;
+    let typeInterval = setInterval(() => {
+        if (charIndex < text.length) {
+            element.textContent += text.charAt(charIndex);
+            charIndex++;
+        } else {
+            clearInterval(typeInterval);
+            activeTypewriters = activeTypewriters.filter(t => t !== typeInterval);
+            element.classList.add('complete');
+            
+            if (activeTypewriters.length === 0) {
+                isTyping = false;
+                storyNextBtn.classList.remove('hidden');
+            }
+            
+            if (callback) callback();
+        }
+    }, typewriterSpeed);
+    
+    activeTypewriters.push(typeInterval);
+}
+
+function skipTyping() {
+    activeTypewriters.forEach(interval => clearInterval(interval));
+    activeTypewriters = [];
+    
+    storyTitle.textContent = dialogueScript[currentDialogueIndex].title || '';
+    storyParagraph.textContent = dialogueScript[currentDialogueIndex].text;
+    storyTitle.classList.add('complete');
+    storyParagraph.classList.add('complete');
+    
+    isTyping = false;
+    storyNextBtn.classList.remove('hidden');
+}
+
+const container = document.getElementById('container');
+
+function showDialogue(index) {
+    if (index >= dialogueScript.length) {
+        storyModal.classList.add('hidden');
+        container.classList.add('visible');
+        return;
+    }
+    
+    const dialogue = dialogueScript[index];
+    isTyping = true;
+    
+    if (dialogue.title) {
+        typeWriter(storyTitle, dialogue.title, () => {
+            typeWriter(storyParagraph, dialogue.text, null);
+        });
+    } else {
+        storyTitle.textContent = '';
+        typeWriter(storyParagraph, dialogue.text, null);
+    }
+}
+
+storyNextBtn.addEventListener('click', () => {
+    if (isTyping) {
+        skipTyping();
+        return;
+    }
+    
+    currentDialogueIndex++;
+    showDialogue(currentDialogueIndex);
+});
+
+storyModal.addEventListener('click', (e) => {
+    if (e.target === storyModal || e.target === storyModal.querySelector('.story-content')) {
+        if (isTyping) {
+            skipTyping();
+        } else if (!storyNextBtn.classList.contains('hidden')) {
+            currentDialogueIndex++;
+            showDialogue(currentDialogueIndex);
+        }
+    }
+});
+
+storyModal.classList.remove('hidden');
+showDialogue(0);
 
 loadCurrentPainting();
 enterIdle();
