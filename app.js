@@ -58,6 +58,16 @@ function updateVideoSize() {
         video.style.top = relativeTop + 'px';
         video.style.right = 'auto';
         video.style.bottom = 'auto';
+        
+        wireframeCanvas.width = canvasRect.width;
+        wireframeCanvas.height = canvasRect.height;
+        wireframeCanvas.style.position = 'absolute';
+        wireframeCanvas.style.left = relativeLeft + 'px';
+        wireframeCanvas.style.top = relativeTop + 'px';
+        wireframeCanvas.style.width = canvasRect.width + 'px';
+        wireframeCanvas.style.height = canvasRect.height + 'px';
+        wireframeCanvas.style.right = 'auto';
+        wireframeCanvas.style.bottom = 'auto';
     }
 }
 
@@ -69,7 +79,7 @@ window.addEventListener('resize', () => {
     }
 });
 
-function updateNoseCursor(x, y) {
+function updateFingerCursor(x, y) {
     if (!noseModeActive || noseCursor.classList.contains('hidden')) return;
 
     const canvasRect = canvas.getBoundingClientRect();
@@ -101,6 +111,8 @@ const eraserBtn = document.getElementById('eraserBtn');
 const brushBtn = document.getElementById('brushBtn');
 const video = document.getElementById('video');
 const noseCursor = document.getElementById('noseCursor');
+const wireframeCanvas = document.getElementById('wireframeCanvas');
+const wireframeCtx = wireframeCanvas.getContext('2d');
 
 colorPicker.addEventListener('change', (e) => {
     currentColor = e.target.value;
@@ -542,6 +554,7 @@ function startDrawPhase() {
     peekBtn.disabled = false;
     finishBtn.disabled = false;
     toolsBar.classList.remove('hidden');
+    showReference(false);
     timerStarted = false;
     timerStartTime = null;
     countdownLabel.textContent = Math.ceil(DRAW_MS / 1000) + 's';
@@ -651,19 +664,19 @@ finishBtn.addEventListener('click', finishGame);
 
 let faceMesh = null;
 let camera = null;
-let lastNoseX = 0;
-let lastNoseY = 0;
-let noseDrawing = false;
-let smoothedNoseX = 0;
-let smoothedNoseY = 0;
-let firstNoseDetection = true;
+let lastFingerX = 0;
+let lastFingerY = 0;
+let fingerDrawing = false;
+let smoothedFingerX = 0;
+let smoothedFingerY = 0;
+let firstFingerDetection = true;
 const SMOOTHING_FACTOR = 0.3;
 const MIN_DISTANCE_THRESHOLD = 0.05;
 
 let hands = null;
-let lastHandRaiseTime = 0;
-const HAND_RAISE_COOLDOWN = 800;
-let handWasRaised = false;
+let lastFistClosedTime = 0;
+const FIST_CLOSED_COOLDOWN = 800;
+let fistWasClosed = false;
 let extractedColors = [];
 let orderedPalette = [];
 let paletteIndex = 0;
@@ -728,11 +741,11 @@ function createOrderedPalette(colors) {
     return ordered;
 }
 
-function changeColorOnHandRaise() {
+function changeColorOnFistClosed() {
     const now = Date.now();
-    if (now - lastHandRaiseTime < HAND_RAISE_COOLDOWN) return;
+    if (now - lastFistClosedTime < FIST_CLOSED_COOLDOWN) return;
 
-    lastHandRaiseTime = now;
+    lastFistClosedTime = now;
     
     if (orderedPalette.length > 0) {
         currentColor = orderedPalette[paletteIndex];
@@ -751,29 +764,43 @@ function changeColorOnHandRaise() {
     }
 }
 
+function isFistClosed(landmarks) {
+    const thumbTip = landmarks[4];
+    const indexTip = landmarks[8];
+    const middleTip = landmarks[12];
+    const ringTip = landmarks[16];
+    const pinkyTip = landmarks[20];
+    const thumbMcp = landmarks[2];
+    const indexMcp = landmarks[5];
+    const middleMcp = landmarks[9];
+    const ringMcp = landmarks[13];
+    const pinkyMcp = landmarks[17];
+    
+    const thumbClosed = thumbTip.y > thumbMcp.y;
+    const indexClosed = indexTip.y > indexMcp.y;
+    const middleClosed = middleTip.y > middleMcp.y;
+    const ringClosed = ringTip.y > ringMcp.y;
+    const pinkyClosed = pinkyTip.y > pinkyMcp.y;
+    
+    return thumbClosed && indexClosed && middleClosed && ringClosed && pinkyClosed;
+}
+
 function onHandResults(results) {
     if (!noseModeActive || !inputEnabled) return;
 
-    const handRaisedThreshold = 0.4;
-
     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
         for (const landmarks of results.multiHandLandmarks) {
-            const wristY = landmarks[0].y;
-            const indexFingerTipY = landmarks[8].y;
-            const middleFingerTipY = landmarks[12].y;
-
-            const minFingerY = Math.min(indexFingerTipY, middleFingerTipY);
-            const handRaised = minFingerY < wristY - 0.1;
-
-            if (handRaised && !handWasRaised) {
-                changeColorOnHandRaise();
-                handWasRaised = true;
-            } else if (!handRaised) {
-                handWasRaised = false;
+            const isClosed = isFistClosed(landmarks);
+            
+            if (isClosed && !fistWasClosed) {
+                changeColorOnFistClosed();
+                fistWasClosed = true;
+            } else if (!isClosed) {
+                fistWasClosed = false;
             }
         }
     } else {
-        handWasRaised = false;
+        fistWasClosed = false;
     }
 }
 
@@ -795,7 +822,10 @@ function initializeHands() {
         minTrackingConfidence: 0.5
     });
 
-    hands.onResults(onHandResults);
+    hands.onResults((results) => {
+        onHandResults(results);
+        onHandResultsForDrawing(results);
+    });
 }
 
 function initializeFaceMesh() {
@@ -823,13 +853,79 @@ function initializeFaceMesh() {
     faceMesh.onResults(onFaceMeshResults);
 }
 
-function onFaceMeshResults(results) {
+function drawWireframe(landmarks, canvasWidth, canvasHeight, videoAspect, canvasAspect) {
+    if (!wireframeCanvas.width || !wireframeCanvas.height) return;
+    
+    wireframeCtx.clearRect(0, 0, wireframeCanvas.width, wireframeCanvas.height);
+    wireframeCtx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+    wireframeCtx.lineWidth = 2;
+    
+    const videoWidth = video.videoWidth || video.clientWidth || 640;
+    const videoHeight = video.videoHeight || video.clientHeight || 480;
+    
+    const faceOutline = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109, 10];
+    const leftEye = [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246, 33];
+    const rightEye = [362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398, 362];
+    const noseBridge = [6, 51, 48, 115, 131];
+    const noseOutline = [4, 5, 6, 51, 48, 115, 131, 134, 102, 49, 220, 305, 290, 4];
+    const mouthOuter = [61, 146, 91, 181, 84, 17, 314, 405, 320, 307, 375, 321, 308, 324, 318, 61];
+    const mouthInner = [78, 95, 88, 178, 87, 14, 317, 402, 318, 324, 308, 78];
+    
+    function mapPoint(landmark) {
+        let x = landmark.x;
+        let y = landmark.y;
+        
+        if (videoAspect > canvasAspect) {
+            const cropHeight = videoWidth / canvasAspect;
+            const cropOffset = (videoHeight - cropHeight) / 2;
+            y = (y - cropOffset / videoHeight) / (cropHeight / videoHeight);
+        } else {
+            const cropWidth = videoHeight * canvasAspect;
+            const cropOffset = (videoWidth - cropWidth) / 2;
+            x = (x - cropOffset / videoWidth) / (cropWidth / videoWidth);
+        }
+        
+        x = Math.max(0, Math.min(1, x));
+        y = Math.max(0, Math.min(1, y));
+        
+        return {
+            x: x * wireframeCanvas.width,
+            y: y * wireframeCanvas.height
+        };
+    }
+    
+    function drawConnected(points) {
+        if (points.length < 2) return;
+        wireframeCtx.beginPath();
+        const validPoints = points.filter(i => i < landmarks.length);
+        if (validPoints.length < 2) return;
+        
+        const first = mapPoint(landmarks[validPoints[0]]);
+        wireframeCtx.moveTo(first.x, first.y);
+        
+        for (let i = 1; i < validPoints.length; i++) {
+            const point = mapPoint(landmarks[validPoints[i]]);
+            wireframeCtx.lineTo(point.x, point.y);
+        }
+        wireframeCtx.stroke();
+    }
+    
+    drawConnected(faceOutline);
+    drawConnected(leftEye);
+    drawConnected(rightEye);
+    drawConnected(noseBridge);
+    drawConnected(noseOutline);
+    drawConnected(mouthOuter);
+    drawConnected(mouthInner);
+}
+
+function onHandResultsForDrawing(results) {
     if (!noseModeActive || !inputEnabled) return;
 
-    if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-        const landmarks = results.multiFaceLandmarks[0];
-        const noseTip = landmarks[4];
-
+    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        const landmarks = results.multiHandLandmarks[0];
+        const indexFingerTip = landmarks[8];
+        
         const canvasWidth = canvas.width;
         const canvasHeight = canvas.height;
         const canvasAspect = canvasWidth / canvasHeight;
@@ -837,69 +933,60 @@ function onFaceMeshResults(results) {
         const videoHeight = video.videoHeight || video.clientHeight || 480;
         const videoAspect = videoWidth / videoHeight;
 
-        let noseX = noseTip.x;
-        let noseY = noseTip.y;
-        let mappedX = noseX;
-        let mappedY = noseY;
+        let fingerX = indexFingerTip.x;
+        let fingerY = indexFingerTip.y;
+        let mappedX = fingerX;
+        let mappedY = fingerY;
 
         if (videoAspect > canvasAspect) {
             const cropHeight = videoWidth / canvasAspect;
             const cropOffset = (videoHeight - cropHeight) / 2;
-            mappedY = (noseY - cropOffset / videoHeight) / (cropHeight / videoHeight);
-            mappedX = noseX;
+            mappedY = (fingerY - cropOffset / videoHeight) / (cropHeight / videoHeight);
+            mappedX = fingerX;
         } else {
             const cropWidth = videoHeight * canvasAspect;
             const cropOffset = (videoWidth - cropWidth) / 2;
-            mappedX = (noseX - cropOffset / videoWidth) / (cropWidth / videoWidth);
-            mappedY = noseY;
+            mappedX = (fingerX - cropOffset / videoWidth) / (cropWidth / videoWidth);
+            mappedY = fingerY;
         }
 
         mappedX = Math.max(0, Math.min(1, mappedX));
         mappedY = Math.max(0, Math.min(1, mappedY));
         
-        if (firstNoseDetection) {
-            smoothedNoseX = mappedX;
-            smoothedNoseY = mappedY;
-            firstNoseDetection = false;
+        if (firstFingerDetection) {
+            smoothedFingerX = mappedX;
+            smoothedFingerY = mappedY;
+            firstFingerDetection = false;
         } else {
-            smoothedNoseX = smoothedNoseX + SMOOTHING_FACTOR * (mappedX - smoothedNoseX);
-            smoothedNoseY = smoothedNoseY + SMOOTHING_FACTOR * (mappedY - smoothedNoseY);
+            smoothedFingerX = smoothedFingerX + SMOOTHING_FACTOR * (mappedX - smoothedFingerX);
+            smoothedFingerY = smoothedFingerY + SMOOTHING_FACTOR * (mappedY - smoothedFingerY);
         }
         
-        const canvasX = smoothedNoseX * canvas.width;
-        const canvasY = smoothedNoseY * canvas.height;
+        const canvasX = smoothedFingerX * canvas.width;
+        const canvasY = smoothedFingerY * canvas.height;
 
-        if (noseDrawing) {
-            updateNoseCursor(canvasX, canvasY);
+        if (fingerDrawing) {
+            updateFingerCursor(canvasX, canvasY);
             noseCursor.classList.remove('hidden');
         } else {
             noseCursor.classList.add('hidden');
         }
 
-        if (landmarks.length > 454) {
-            const leftCheek = landmarks[234];
-            const rightCheek = landmarks[454];
-            const faceWidth = Math.abs(leftCheek.x - rightCheek.x);
-            const distanceFactor = Math.min(Math.max(faceWidth * 50, 0.5), 2);
-            const brushSizeScaled = brushSize * distanceFactor;
-            ctx.lineWidth = brushSizeScaled;
-        } else {
-            ctx.lineWidth = brushSize;
-        }
+        ctx.lineWidth = brushSize;
 
         const distance = Math.sqrt(
-            Math.pow(canvasX - lastNoseX, 2) + 
-            Math.pow(canvasY - lastNoseY, 2)
+            Math.pow(canvasX - lastFingerX, 2) + 
+            Math.pow(canvasY - lastFingerY, 2)
         );
 
         const minMovement = 2;
 
-        if (!noseDrawing) {
-            if (lastNoseX === 0 && lastNoseY === 0) {
-                lastNoseX = canvasX;
-                lastNoseY = canvasY;
+        if (!fingerDrawing) {
+            if (lastFingerX === 0 && lastFingerY === 0) {
+                lastFingerX = canvasX;
+                lastFingerY = canvasY;
             } else if (distance > MIN_DISTANCE_THRESHOLD * Math.min(canvas.width, canvas.height)) {
-                noseDrawing = true;
+                fingerDrawing = true;
                 startTimer();
             }
         } else {
@@ -920,13 +1007,30 @@ function onFaceMeshResults(results) {
                     ctx.globalCompositeOperation = 'source-over';
                 }
 
-                lastNoseX = constrainedX;
-                lastNoseY = constrainedY;
+                lastFingerX = constrainedX;
+                lastFingerY = constrainedY;
             }
         }
     } else {
-        noseDrawing = false;
+        fingerDrawing = false;
         noseCursor.classList.add('hidden');
+    }
+}
+
+function onFaceMeshResults(results) {
+    if (!noseModeActive || !inputEnabled) return;
+
+    if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+        const landmarks = results.multiFaceLandmarks[0];
+        
+        const canvasWidth = canvas.width;
+        const canvasHeight = canvas.height;
+        const canvasAspect = canvasWidth / canvasHeight;
+        const videoWidth = video.videoWidth || video.clientWidth || 640;
+        const videoHeight = video.videoHeight || video.clientHeight || 480;
+        const videoAspect = videoWidth / videoHeight;
+        
+        drawWireframe(landmarks, canvasWidth, canvasHeight, videoAspect, canvasAspect);
     }
 }
 
@@ -973,6 +1077,7 @@ async function startNoseMode() {
         video.srcObject = stream;
         await video.play();
         video.classList.remove('hidden');
+        wireframeCanvas.classList.remove('hidden');
 
         setTimeout(() => {
             updateVideoSize();
@@ -992,15 +1097,16 @@ async function startNoseMode() {
             width: camWidth,
             height: camHeight
         });
+        
         camera.start();
         canvas.style.pointerEvents = 'none';
 
-        noseDrawing = false;
-        smoothedNoseX = 0;
-        smoothedNoseY = 0;
-        lastNoseX = 0;
-        lastNoseY = 0;
-        firstNoseDetection = true;
+        fingerDrawing = false;
+        smoothedFingerX = 0;
+        smoothedFingerY = 0;
+        lastFingerX = 0;
+        lastFingerY = 0;
+        firstFingerDetection = true;
     } catch (err) {
         noseModeActive = false;
         console.error('Error accessing camera:', err);
@@ -1014,7 +1120,7 @@ async function startNoseMode() {
 
 function stopNoseMode() {
     noseModeActive = false;
-    noseDrawing = false;
+    fingerDrawing = false;
 
     if (camera) {
         camera.stop();
