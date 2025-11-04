@@ -1097,7 +1097,7 @@ async function startNoseMode() {
             width: camWidth,
             height: camHeight
         });
-        
+
         camera.start();
         canvas.style.pointerEvents = 'none';
 
@@ -1161,9 +1161,10 @@ const storyTitle = document.getElementById('storyTitle');
 const storyParagraph = document.getElementById('storyParagraph');
 
 const dialogueScript = [
-    { title: 'The Great Museum Heist', text: 'Our museum was robbed!' },
-    { title: '', text: 'While we\'re figuring out how to recover our jewels...' },
-    { title: '', text: '...you will be forced to make our masterpieces!' },
+    { title: 'The Great Museum Heist', text: 'Our museum was robbed!', image: 'images/museum1.png' },
+    { title: '', text: 'While we\'re figuring out how to recover our jewels...', image: 'images/museum2.png' },
+    { title: '', text: '...you will be forced to make our masterpieces (with a few twists)!', image: 'images/museum3.png' },
+    { title: '', text: '(by the way, did you know the password for the louvre\'s system was "louvre"?)' },
     { title: '', text: 'Begin your quest, brave artist!' }
 ];
 
@@ -1185,12 +1186,10 @@ function typeWriter(element, text, callback) {
             clearInterval(typeInterval);
             activeTypewriters = activeTypewriters.filter(t => t !== typeInterval);
             element.classList.add('complete');
-            
             if (activeTypewriters.length === 0) {
                 isTyping = false;
                 storyNextBtn.classList.remove('hidden');
             }
-            
             if (callback) callback();
         }
     }, typewriterSpeed);
@@ -1202,8 +1201,22 @@ function skipTyping() {
     activeTypewriters.forEach(interval => clearInterval(interval));
     activeTypewriters = [];
     
-    storyTitle.textContent = dialogueScript[currentDialogueIndex].title || '';
-    storyParagraph.textContent = dialogueScript[currentDialogueIndex].text;
+    const dialogue = dialogueScript[currentDialogueIndex];
+    if (dialogue.image) {
+        storyImage.src = dialogue.image;
+        storyImage.classList.remove('hidden');
+    } else {
+        storyImage.classList.add('hidden');
+    }
+    
+    if (dialogue.title) {
+        storyTitle.style.display = '';
+        storyTitle.textContent = dialogue.title;
+    } else {
+        storyTitle.textContent = '';
+        storyTitle.style.display = 'none';
+    }
+    storyParagraph.textContent = dialogue.text;
     storyTitle.classList.add('complete');
     storyParagraph.classList.add('complete');
     
@@ -1223,12 +1236,21 @@ function showDialogue(index) {
     const dialogue = dialogueScript[index];
     isTyping = true;
     
+    if (dialogue.image) {
+        storyImage.src = dialogue.image;
+        storyImage.classList.remove('hidden');
+    } else {
+        storyImage.classList.add('hidden');
+    }
+    
     if (dialogue.title) {
+        storyTitle.style.display = '';
         typeWriter(storyTitle, dialogue.title, () => {
             typeWriter(storyParagraph, dialogue.text, null);
         });
     } else {
         storyTitle.textContent = '';
+        storyTitle.style.display = 'none';
         typeWriter(storyParagraph, dialogue.text, null);
     }
 }
