@@ -328,6 +328,15 @@ h1 {
     min-height: 1.6em;
 }
 
+.story-link {
+    color: #000000;
+    text-decoration: underline;
+}
+
+.story-link:hover {
+    color: #333333;
+}
+
 .story-paragraph::after {
     content: '|';
     animation: blink 1s infinite;

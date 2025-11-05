@@ -1164,8 +1164,8 @@ const dialogueScript = [
     { title: 'The Great Museum Heist', text: 'Our museum was robbed!', image: 'images/museum1.png' },
     { title: '', text: 'While we\'re figuring out how to recover our jewels...', image: 'images/museum2.png' },
     { title: '', text: '...you will be forced to make our masterpieces (with a few twists)!', image: 'images/museum3.png' },
-    { title: '', text: '(by the way, did you know the password for the louvre\'s system was "louvre"?)' },
-    { title: '', text: 'Begin your quest, brave artist!' }
+    { title: '', html: '(by the way, did you know the <a href="https://news.ycombinator.com/item?id=45803302" target="_blank" class="story-link">louvre\'s system password was "louvre"</a>?)' },
+    { title: '', text: 'Begin your quest, brave artist!', image: 'images/museum6.png' }
 ];
 
 let currentDialogueIndex = 0;
@@ -1177,6 +1177,7 @@ function typeWriter(element, text, callback) {
     element.textContent = '';
     element.classList.remove('complete');
     storyNextBtn.classList.add('hidden');
+
     let charIndex = 0;
     let typeInterval = setInterval(() => {
         if (charIndex < text.length) {
@@ -1193,14 +1194,14 @@ function typeWriter(element, text, callback) {
             if (callback) callback();
         }
     }, typewriterSpeed);
-    
+
     activeTypewriters.push(typeInterval);
 }
 
 function skipTyping() {
     activeTypewriters.forEach(interval => clearInterval(interval));
     activeTypewriters = [];
-    
+
     const dialogue = dialogueScript[currentDialogueIndex];
     if (dialogue.image) {
         storyImage.src = dialogue.image;
@@ -1208,7 +1209,7 @@ function skipTyping() {
     } else {
         storyImage.classList.add('hidden');
     }
-    
+
     if (dialogue.title) {
         storyTitle.style.display = '';
         storyTitle.textContent = dialogue.title;
@@ -1216,7 +1217,11 @@ function skipTyping() {
         storyTitle.textContent = '';
         storyTitle.style.display = 'none';
     }
-    storyParagraph.textContent = dialogue.text;
+    if (dialogue.html) {
+        storyParagraph.innerHTML = dialogue.html;
+    } else {
+        storyParagraph.textContent = dialogue.text;
+    }
     storyTitle.classList.add('complete');
     storyParagraph.classList.add('complete');
     
@@ -1246,12 +1251,28 @@ function showDialogue(index) {
     if (dialogue.title) {
         storyTitle.style.display = '';
         typeWriter(storyTitle, dialogue.title, () => {
-            typeWriter(storyParagraph, dialogue.text, null);
+            if (dialogue.html) {
+                storyParagraph.innerHTML = dialogue.html;
+                storyParagraph.classList.add('complete');
+                if (activeTypewriters.length === 0) {
+                    isTyping = false;
+                    storyNextBtn.classList.remove('hidden');
+                }
+            } else {
+                typeWriter(storyParagraph, dialogue.text, null);
+            }
         });
     } else {
         storyTitle.textContent = '';
         storyTitle.style.display = 'none';
-        typeWriter(storyParagraph, dialogue.text, null);
+        if (dialogue.html) {
+            storyParagraph.innerHTML = dialogue.html;
+            storyParagraph.classList.add('complete');
+            isTyping = false;
+            storyNextBtn.classList.remove('hidden');
+        } else {
+            typeWriter(storyParagraph, dialogue.text, null);
+        }
     }
 }
 
