@@ -156,14 +156,6 @@ h1 {
     transform: scaleX(-1);
 }
 
-#wireframeCanvas {
-    position: absolute;
-    pointer-events: none;
-    border-radius: 4px;
-    z-index: 999;
-    transform: scaleX(-1);
-}
-
 .canvas-container {
     position: relative;
 }
@@ -342,6 +334,14 @@ h1 {
     animation: blink 1s infinite;
     color: #000000;
     font-weight: bold;
+}
+
+.story-paragraph code {
+    background: #f0f0f0;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 0.9em;
 }
 
 .story-paragraph.complete::after {

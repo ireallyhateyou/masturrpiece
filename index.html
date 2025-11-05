@@ -17,7 +17,19 @@
                 <img id="storyImage" class="story-image hidden" alt="">
                 <p class="story-paragraph" id="storyParagraph"></p>
             </div>
-            <button class="btn story-btn hidden" id="storyNextBtn">Next</button>
+            <button class="btn story-btn hidden" id="storyNextBtn">next</button>
+        </div>
+    </div>
+
+    <div class="story-modal" id="hwAccelModal" style="display: none;">
+        <div class="story-content">
+            <div class="story-text">
+                <h2 class="story-title">Hardware Acceleration, Please</h2>
+                <p class="story-paragraph">
+                    Your browser is using software rendering, which will mess up the face tracking. Please enable hardware acceleration.
+                </p>
+            </div>
+            <button class="btn story-btn" id="hwAccelCloseBtn">continue anyway</button>
         </div>
     </div>
 
@@ -62,7 +74,6 @@
                 <h3>Your Drawing</h3>
                 <div class="canvas-container">
                     <canvas id="canvas"></canvas>
-                    <canvas id="wireframeCanvas" class="hidden"></canvas>
                     <video id="video" autoplay playsinline class="hidden"></video>
                     <div id="noseCursor" class="nose-cursor hidden"></div>
                 </div>
