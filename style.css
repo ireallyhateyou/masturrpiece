@@ -154,6 +154,8 @@ h1 {
     pointer-events: none;
     border-radius: 4px;
     transform: scaleX(-1);
+    width: 100% !important;
+    height: 100% !important;
 }
 
 .canvas-container {

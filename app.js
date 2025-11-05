@@ -58,6 +58,7 @@ function updateVideoSize() {
         video.style.top = relativeTop + 'px';
         video.style.right = 'auto';
         video.style.bottom = 'auto';
+        video.style.objectFit = 'cover';
     }
 }
 
@@ -69,7 +70,7 @@ window.addEventListener('resize', () => {
     }
 });
 
-function updateNoseCursor(x, y) {
+function updateFingerCursor(x, y) {
     if (!noseModeActive) return;
 
     const canvasRect = canvas.getBoundingClientRect();
@@ -611,6 +612,7 @@ function finishGame() {
     countdownLabel.textContent = '';
     updateTimerBar(1);
     toolsBar.classList.add('hidden');
+
     const grade = compareWithPainting();
     if (grade !== null) {
         phaseLabel.textContent = 'Round cleared!';
@@ -658,12 +660,12 @@ finishBtn.addEventListener('click', finishGame);
 
 let faceMesh = null;
 let camera = null;
-let lastNoseX = 0;
-let lastNoseY = 0;
-let noseDrawing = false;
-let smoothedNoseX = 0;
-let smoothedNoseY = 0;
-let firstNoseDetection = true;
+let lastFingerX = 0;
+let lastFingerY = 0;
+let fingerDrawing = false;
+let smoothedFingerX = 0;
+let smoothedFingerY = 0;
+let firstFingerDetection = true;
 const SMOOTHING_FACTOR = 0.9;
 const MIN_DISTANCE_THRESHOLD = 0.05;
 
@@ -682,9 +684,9 @@ function extractPrimaryColors(img) {
 
     const tempCtx = tempCanvas.getContext('2d');
     tempCtx.drawImage(img, 0, 0, tempCanvas.width, tempCanvas.height);
+
     const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
     const pixels = imageData.data;
-
     const colorMap = new Map();
     const sampleStep = 4;
 
@@ -778,10 +780,122 @@ function isFistClosed(landmarks) {
     return thumbClosed && indexClosed && middleClosed && ringClosed && pinkyClosed;
 }
 
+function isIndexFingerExtended(landmarks) {
+    const indexTip = landmarks[8];
+    const indexPip = landmarks[6];
+    const indexMcp = landmarks[5];
+    
+    return indexTip.y < indexPip.y && indexPip.y < indexMcp.y;
+}
+
 function onHandResults(results) {
     if (!noseModeActive || !inputEnabled) return;
 
     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        const landmarks = results.multiHandLandmarks[0];
+        const indexFingerTip = landmarks[8];
+        const indexFingerExtended = isIndexFingerExtended(landmarks);
+        
+        if (indexFingerTip) {
+            let fingerX = indexFingerTip.x;
+            let fingerY = indexFingerTip.y;
+            
+            fingerX = Math.max(0, Math.min(1, fingerX));
+            fingerY = Math.max(0, Math.min(1, fingerY));
+            
+            if (firstFingerDetection) {
+                smoothedFingerX = fingerX;
+                smoothedFingerY = fingerY;
+                firstFingerDetection = false;
+            } else {
+                smoothedFingerX = smoothedFingerX + SMOOTHING_FACTOR * (fingerX - smoothedFingerX);
+                smoothedFingerY = smoothedFingerY + SMOOTHING_FACTOR * (fingerY - smoothedFingerY);
+            }
+            
+            const videoWidth = video.videoWidth || video.clientWidth || 640;
+            const videoHeight = video.videoHeight || video.clientHeight || 480;
+            const videoAspect = videoWidth / videoHeight;
+            const canvasAspect = canvas.width / canvas.height;
+            
+            let mappedX = smoothedFingerX;
+            let mappedY = smoothedFingerY;
+            
+            if (videoAspect > canvasAspect) {
+                const scale = canvasAspect / videoAspect;
+                const offset = (1 - scale) / 2;
+                mappedX = (smoothedFingerX - offset) / scale;
+                mappedY = smoothedFingerY;
+            } else {
+                const scale = videoAspect / canvasAspect;
+                const offset = (1 - scale) / 2;
+                mappedX = smoothedFingerX;
+                mappedY = (smoothedFingerY - offset) / scale;
+            }
+            
+            mappedX = Math.max(0, Math.min(1, mappedX));
+            mappedY = Math.max(0, Math.min(1, mappedY));
+            
+            const canvasX = (1 - mappedX) * canvas.width;
+            const canvasY = mappedY * canvas.height;
+            
+            updateFingerCursor(canvasX, canvasY);
+            noseCursor.classList.remove('hidden');
+            
+            if (!indexFingerExtended) {
+                if (fingerDrawing) {
+                    fingerDrawing = false;
+                }
+            } else {
+                ctx.lineWidth = brushSize;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                
+                if (currentTool === 'eraser') {
+                    ctx.globalCompositeOperation = 'destination-out';
+                    ctx.strokeStyle = 'rgba(0,0,0,1)';
+                } else {
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.strokeStyle = currentColor;
+                }
+                
+                const distance = Math.sqrt(
+                    Math.pow(canvasX - lastFingerX, 2) + 
+                    Math.pow(canvasY - lastFingerY, 2)
+                );
+                
+                if (!fingerDrawing) {
+                    if (lastFingerX === 0 && lastFingerY === 0) {
+                        lastFingerX = canvasX;
+                        lastFingerY = canvasY;
+                    } else if (distance > MIN_DISTANCE_THRESHOLD * Math.min(canvas.width, canvas.height)) {
+                        fingerDrawing = true;
+                        startTimer();
+                        ctx.beginPath();
+                        ctx.moveTo(canvasX, canvasY);
+                        lastFingerX = canvasX;
+                        lastFingerY = canvasY;
+                    }
+                } else {
+                    const constrainedX = Math.max(0, Math.min(canvas.width, canvasX));
+                    const constrainedY = Math.max(0, Math.min(canvas.height, canvasY));
+                    
+                    if (distance > 1) {
+                        ctx.lineTo(constrainedX, constrainedY);
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.moveTo(constrainedX, constrainedY);
+                        
+                        lastFingerX = constrainedX;
+                        lastFingerY = constrainedY;
+                    }
+                }
+                
+                if (currentTool === 'eraser') {
+                    ctx.globalCompositeOperation = 'source-over';
+                }
+            }
+        }
+        
         for (const landmarks of results.multiHandLandmarks) {
             const isClosed = isFistClosed(landmarks);
             if (isClosed && !fistWasClosed) {
@@ -792,6 +906,8 @@ function onHandResults(results) {
             }
         }
     } else {
+        fingerDrawing = false;
+        noseCursor.classList.add('hidden');
         fistWasClosed = false;
     }
 }
@@ -843,44 +959,7 @@ function initializeFaceMesh() {
 }
 
 function onFaceMeshResults(results) {
-    if (!noseModeActive || !inputEnabled) {
-        if (window.DEBUG_NOSE) console.log('Nose tracking skipped:', { noseModeActive, inputEnabled });
-        return;
-    }
-
-    if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-        const landmarks = results.multiFaceLandmarks[0];
-        const noseTip = landmarks[4];
-
-        if (!noseTip) {
-            if (window.DEBUG_NOSE) console.log('No nose tip found in landmarks');
-            return;
-        }
-
-        const canvasWidth = canvas.width;
-        const canvasHeight = canvas.height;
-        const canvasAspect = canvasWidth / canvasHeight;
-        const videoWidth = video.videoWidth || video.clientWidth || 640;
-        const videoHeight = video.videoHeight || video.clientHeight || 480;
-        const videoAspect = videoWidth / videoHeight;
-
-        let noseX = noseTip.x;
-        let noseY = noseTip.y;
-        let mappedX = noseX;
-        let mappedY = noseY;
-
-        mappedX = Math.max(0, Math.min(1, mappedX));
-        mappedY = Math.max(0, Math.min(1, mappedY));
-        
-        const canvasX = mappedX * canvas.width;
-        const canvasY = mappedY * canvas.height;
-        
-        updateNoseCursor(canvasX, canvasY);
-        noseCursor.classList.remove('hidden');
-    } else {
-        noseCursor.classList.add('hidden');
-        if (window.DEBUG_NOSE) console.log('No face detected');
-    }
+    // Face mesh is no longer used for drawing, only for potential future features
 }
 
 async function startNoseMode() {
@@ -891,14 +970,10 @@ async function startNoseMode() {
     noseModeActive = true;
 
     try {
-        if (typeof FaceMesh === 'undefined' || typeof Camera === 'undefined') {
+        if (typeof Camera === 'undefined') {
             alert('MediaPipe libraries are loading. Please wait a moment and try again.');
             noseModeActive = false;
             return;
-        }
-
-        if (!faceMesh) {
-            initializeFaceMesh();
         }
 
         if (!hands) {
@@ -933,9 +1008,6 @@ async function startNoseMode() {
         camera = new Camera(video, {
             onFrame: async () => {
                 if (noseModeActive) {
-                    if (faceMesh) {
-                        await faceMesh.send({ image: video });
-                    }
                     if (hands) {
                         await hands.send({ image: video });
                     }
@@ -948,12 +1020,12 @@ async function startNoseMode() {
         camera.start();
         canvas.style.pointerEvents = 'none';
 
-        noseDrawing = false;
-        smoothedNoseX = 0;
-        smoothedNoseY = 0;
-        lastNoseX = 0;
-        lastNoseY = 0;
-        firstNoseDetection = true;
+        fingerDrawing = false;
+        smoothedFingerX = 0;
+        smoothedFingerY = 0;
+        lastFingerX = 0;
+        lastFingerY = 0;
+        firstFingerDetection = true;
 
         window.DEBUG_NOSE = true;
         console.log('Nose mode started. Debug enabled. Type DEBUG_NOSE=false to disable.');
