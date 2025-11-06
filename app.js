@@ -52,7 +52,7 @@ function updateVideoSize() {
         video.style.bottom = '10px';
         video.style.right = '10px';
         video.style.objectFit = 'cover';
-        
+
         const handCanvas = document.getElementById('handWireframeCanvas');
         if (handCanvas && !handCanvas.classList.contains('hidden')) {
             handCanvas.width = 200;
@@ -75,11 +75,10 @@ function updateFingerCursor(canvasX, canvasY) {
     const canvasRect = canvas.getBoundingClientRect();
     const scaleX = canvasRect.width / canvas.width;
     const scaleY = canvasRect.height / canvas.height;
-    const brushSizeScaled = brushSize * Math.max(scaleX, scaleY) * 2.5;
-
     const screenX = canvasRect.left + (canvasX / canvas.width) * canvasRect.width;
     const screenY = canvasRect.top + (canvasY / canvas.height) * canvasRect.height;
-    
+    const brushSizeScaled = brushSize * Math.max(scaleX, scaleY) * 2.5;
+
     noseCursor.style.left = screenX + 'px';
     noseCursor.style.top = screenY + 'px';
     noseCursor.style.width = brushSizeScaled + 'px';
@@ -268,9 +267,12 @@ paintingImg.onload = () => {
     paintingImg.style.height = 'auto';
     paintingImg.classList.remove('hidden');
     
-    extractedColors = extractPrimaryColors(paintingImg);
-    orderedPalette = createOrderedPalette(extractedColors);
-    paletteIndex = 0;
+    // le async moment
+    setTimeout(() => {
+        extractedColors = extractPrimaryColors(paintingImg);
+        orderedPalette = createOrderedPalette(extractedColors);
+        paletteIndex = 0;
+    }, 0);
     
     if (noseModeActive) {
         setTimeout(updateVideoSize, 100);
@@ -534,6 +536,7 @@ function enterGameReady() {
 }
 
 function startMemorizePhase() {
+    console.log('Starting memorize phase');
     resetCanvas();
     setInputEnabled(false);
     phaseLabel.textContent = 'Memorize';
@@ -545,6 +548,7 @@ function startMemorizePhase() {
     
     if (countdownIntervalId) {
         clearInterval(countdownIntervalId);
+        countdownIntervalId = null;
     }
     
     countdownIntervalId = setInterval(() => {
@@ -560,10 +564,15 @@ function startMemorizePhase() {
 
     if (memorizeTimerId) {
         clearTimeout(memorizeTimerId);
+        memorizeTimerId = null;
     }
     
     memorizeTimerId = setTimeout(() => {
         console.log('Memorize phase complete, starting draw phase');
+        if (countdownIntervalId) {
+            clearInterval(countdownIntervalId);
+            countdownIntervalId = null;
+        }
         showReference(false);
         startDrawPhase();
     }, MEMORIZE_MS);
@@ -594,7 +603,7 @@ function startDrawPhase() {
 
 function startTimer() {
     if (timerStarted) return;
-    
+
     timerStarted = true;
     timerStartTime = Date.now();
     countdownLabel.textContent = Math.ceil(DRAW_MS / 1000) + 's';
@@ -714,8 +723,8 @@ let paletteIndex = 0;
 
 function extractPrimaryColors(img) {
     const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = Math.min(img.naturalWidth, 300);
-    tempCanvas.height = Math.min(img.naturalHeight, 300);
+    tempCanvas.width = Math.min(img.naturalWidth, 200);
+    tempCanvas.height = Math.min(img.naturalHeight, 200);
 
     const tempCtx = tempCanvas.getContext('2d');
     tempCtx.drawImage(img, 0, 0, tempCanvas.width, tempCanvas.height);
@@ -723,7 +732,7 @@ function extractPrimaryColors(img) {
     const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
     const pixels = imageData.data;
     const colorMap = new Map();
-    const sampleStep = 4;
+    const sampleStep = 8;
 
     for (let i = 0; i < pixels.length; i += sampleStep * 4) {
         const r = Math.floor(pixels[i] / 32) * 32;
@@ -1024,20 +1033,24 @@ function initializeHands() {
         return;
     }
 
-    hands = new Hands({
-        locateFile: (file) => {
-            return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
-        }
-    });
+    try {
+        hands = new Hands({
+            locateFile: (file) => {
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+            }
+        });
 
-    hands.setOptions({
-        maxNumHands: 2,
-        modelComplexity: 1,
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5
-    });
+        hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 0,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
 
-    hands.onResults(onHandResults);
+        hands.onResults(onHandResults);
+    } catch (error) {
+        console.error('Error initializing hands:', error);
+    }
 }
 
 function initializeFaceMesh() {
@@ -1117,11 +1130,20 @@ async function startNoseMode() {
             updateVideoSize();
         }, 100);
 
+        let lastHandsSend = 0;
+        const HANDS_SEND_THROTTLE = 33;
+        
         camera = new Camera(video, {
             onFrame: async () => {
-                if (noseModeActive) {
-                    if (hands) {
-                        await hands.send({ image: video });
+                if (noseModeActive && hands) {
+                    const now = Date.now();
+                    if (now - lastHandsSend >= HANDS_SEND_THROTTLE) {
+                        lastHandsSend = now;
+                        try {
+                            await hands.send({ image: video });
+                        } catch (error) {
+                            console.error('Error sending to hands:', error);
+                        }
                     }
                 }
             },
