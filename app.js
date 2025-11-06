@@ -9,8 +9,8 @@ function clampZeroToOne(value) {
 
 function resizeCanvas() {
     const container = canvas.parentElement;
-    const limitWidth = Math.min(800, container.clientWidth - 40);
-    const limitHeight = Math.min(600, window.innerHeight - 300);
+    const limitWidth = Math.min(1000, container.clientWidth - 40);
+    const limitHeight = Math.min(750, window.innerHeight - 300);
     let newWidth = limitWidth;
     let newHeight = limitHeight;
 
@@ -46,19 +46,18 @@ function resizeCanvas() {
 
 function updateVideoSize() {
     if (noseModeActive && !video.classList.contains('hidden')) {
-        const canvasRect = canvas.getBoundingClientRect();
-        const containerRect = canvas.parentElement.getBoundingClientRect();
-        const relativeLeft = canvasRect.left - containerRect.left;
-        const relativeTop = canvasRect.top - containerRect.top;
-
-        video.style.position = 'absolute';
-        video.style.width = canvasRect.width + 'px';
-        video.style.height = canvasRect.height + 'px';
-        video.style.left = relativeLeft + 'px';
-        video.style.top = relativeTop + 'px';
-        video.style.right = 'auto';
-        video.style.bottom = 'auto';
+        video.style.position = 'fixed';
+        video.style.width = '200px';
+        video.style.height = '150px';
+        video.style.bottom = '10px';
+        video.style.right = '10px';
         video.style.objectFit = 'cover';
+        
+        const handCanvas = document.getElementById('handWireframeCanvas');
+        if (handCanvas && !handCanvas.classList.contains('hidden')) {
+            handCanvas.width = 200;
+            handCanvas.height = 150;
+        }
     }
 }
 
@@ -70,18 +69,19 @@ window.addEventListener('resize', () => {
     }
 });
 
-function updateFingerCursor(x, y) {
+function updateFingerCursor(canvasX, canvasY) {
     if (!noseModeActive) return;
 
     const canvasRect = canvas.getBoundingClientRect();
-    const containerRect = canvas.parentElement.getBoundingClientRect();
-
     const scaleX = canvasRect.width / canvas.width;
     const scaleY = canvasRect.height / canvas.height;
     const brushSizeScaled = brushSize * Math.max(scaleX, scaleY) * 2.5;
 
-    noseCursor.style.left = (canvasRect.left - containerRect.left + x * scaleX) + 'px';
-    noseCursor.style.top = (canvasRect.top - containerRect.top + y * scaleY) + 'px';
+    const screenX = canvasRect.left + (canvasX / canvas.width) * canvasRect.width;
+    const screenY = canvasRect.top + (canvasY / canvas.height) * canvasRect.height;
+    
+    noseCursor.style.left = screenX + 'px';
+    noseCursor.style.top = screenY + 'px';
     noseCursor.style.width = brushSizeScaled + 'px';
     noseCursor.style.height = brushSizeScaled + 'px';
 }
@@ -102,6 +102,11 @@ const eraserBtn = document.getElementById('eraserBtn');
 const brushBtn = document.getElementById('brushBtn');
 const video = document.getElementById('video');
 const noseCursor = document.getElementById('noseCursor');
+const handWireframeCanvas = document.getElementById('handWireframeCanvas');
+let handWireframeCtx = null;
+if (handWireframeCanvas) {
+    handWireframeCtx = handWireframeCanvas.getContext('2d');
+}
 
 colorPicker.addEventListener('change', (e) => {
     currentColor = e.target.value;
@@ -488,9 +493,18 @@ function enterIdle() {
     setInputEnabled(false);
     showReference(false);
     gameBar.classList.remove('hidden');
+    gameBar.classList.remove('active-game');
     toolsBar.classList.add('hidden');
     referenceTitle.textContent = paintings[currentPaintingIndex]?.title || 'Reference';
     setResultsBarVisible(false);
+    comparisonSection.classList.add('hidden');
+    document.getElementById('loreText').classList.remove('hidden');
+    peekBtn.classList.add('hidden');
+    finishBtn.classList.add('hidden');
+    document.getElementById('timerGroup').classList.add('hidden');
+    startGameBtn.disabled = false;
+    startGameBtn.textContent = 'Start Challenge';
+    startGameBtn.classList.remove('hidden');
 }
 
 function enterGameReady() {
@@ -503,13 +517,20 @@ function enterGameReady() {
     updateTimerBar(0);
     showReference(false);
     gameBar.classList.remove('hidden');
+    gameBar.classList.add('active-game');
     referenceTitle.textContent = 'Reference (Hidden)';
     setResultsBarVisible(false);
     peekBtn.disabled = true;
     finishBtn.disabled = true;
+    peekBtn.classList.remove('hidden');
+    finishBtn.classList.remove('hidden');
+    document.getElementById('timerGroup').classList.remove('hidden');
     toolsBar.classList.add('hidden');
     timerStarted = false;
     timerStartTime = null;
+    comparisonSection.classList.remove('hidden');
+    document.getElementById('loreText').classList.add('hidden');
+    startGameBtn.classList.add('hidden');
 }
 
 function startMemorizePhase() {
@@ -521,6 +542,11 @@ function startMemorizePhase() {
 
     const start = Date.now();
     updateTimerBar(0);
+    
+    if (countdownIntervalId) {
+        clearInterval(countdownIntervalId);
+    }
+    
     countdownIntervalId = setInterval(() => {
         const elapsed = Date.now() - start;
         const remaining = Math.max(0, MEMORIZE_MS - elapsed);
@@ -528,16 +554,23 @@ function startMemorizePhase() {
         updateTimerBar(elapsed / MEMORIZE_MS);
         if (remaining <= 0) {
             clearInterval(countdownIntervalId);
+            countdownIntervalId = null;
         }
     }, 100);
 
+    if (memorizeTimerId) {
+        clearTimeout(memorizeTimerId);
+    }
+    
     memorizeTimerId = setTimeout(() => {
+        console.log('Memorize phase complete, starting draw phase');
         showReference(false);
         startDrawPhase();
     }, MEMORIZE_MS);
 }
 
 function startDrawPhase() {
+    console.log('Starting draw phase');
     phaseLabel.textContent = 'Draw!';
     setInputEnabled(true);
     peekBtn.disabled = false;
@@ -625,16 +658,17 @@ function finishGame() {
                 if (paintingLoaded) {
                     clearInterval(waitForLoad);
                     startGameBtn.disabled = true;
-                    startGameBtn.textContent = 'Running...';
+                    startGameBtn.classList.add('hidden');
                     enterGameReady();
                     startMemorizePhase();
                 }
             }, 100);
         }, 1000);
     } else {
-        startGameBtn.textContent = 'Play Again';
+        startGameBtn.textContent = 'Start Challenge';
         startGameBtn.disabled = false;
         setResultsBarVisible(true);
+        enterIdle();
     }
 }
 
@@ -649,8 +683,10 @@ startGameBtn.addEventListener('click', () => {
         return;
     }
     
+    console.log('Starting game...');
     startGameBtn.disabled = true;
-    startGameBtn.textContent = 'Running...';
+    startGameBtn.classList.add('hidden');
+    startGameBtn.textContent = 'Start Challenge';
     enterGameReady();
     startMemorizePhase();
 });
@@ -668,10 +704,9 @@ let smoothedFingerY = 0;
 let firstFingerDetection = true;
 const SMOOTHING_FACTOR = 0.9;
 const MIN_DISTANCE_THRESHOLD = 0.05;
-
+const FIST_CLOSED_COOLDOWN = 800;
 let hands = null;
 let lastFistClosedTime = 0;
-const FIST_CLOSED_COOLDOWN = 800;
 let fistWasClosed = false;
 let extractedColors = [];
 let orderedPalette = [];
@@ -739,45 +774,62 @@ function createOrderedPalette(colors) {
 
 function changeColorOnFistClosed() {
     const now = Date.now();
-    if (now - lastFistClosedTime < FIST_CLOSED_COOLDOWN) return;
+    if (now - lastFistClosedTime < FIST_CLOSED_COOLDOWN) {
+        console.log('Fist color change on cooldown, remaining:', FIST_CLOSED_COOLDOWN - (now - lastFistClosedTime), 'ms');
+        return;
+    }
     lastFistClosedTime = now;
 
+    console.log('Changing color - palette length:', orderedPalette.length, 'current index:', paletteIndex);
+    
     if (orderedPalette.length > 0) {
         currentColor = orderedPalette[paletteIndex];
         paletteIndex = (paletteIndex + 1) % orderedPalette.length;
     } else {
         currentColor = '#000000';
+        console.warn('No palette available, using black');
     }
 
     if (colorPicker) {
         colorPicker.value = currentColor;
     }
 
-    if (currentTool === 'brush') {
-        ctx.strokeStyle = currentColor;
-        ctx.fillStyle = currentColor;
-    }
+    ctx.strokeStyle = currentColor;
+    ctx.fillStyle = currentColor;
+    
+    console.log('Color changed to:', currentColor, 'Palette index:', paletteIndex, 'Total palette:', orderedPalette);
 }
 
 function isFistClosed(landmarks) {
-    const thumbTip = landmarks[4];
+    if (!landmarks || landmarks.length < 21) return false;
+    
     const indexTip = landmarks[8];
-    const middleTip = landmarks[12];
-    const ringTip = landmarks[16];
-    const pinkyTip = landmarks[20];
-    const thumbMcp = landmarks[2];
+    const indexPip = landmarks[6];
     const indexMcp = landmarks[5];
+    const middleTip = landmarks[12];
+    const middlePip = landmarks[10];
     const middleMcp = landmarks[9];
+    const ringTip = landmarks[16];
+    const ringPip = landmarks[14];
     const ringMcp = landmarks[13];
+    const pinkyTip = landmarks[20];
+    const pinkyPip = landmarks[18];
     const pinkyMcp = landmarks[17];
+    const thumbTip = landmarks[4];
+    const thumbIp = landmarks[3];
+    const thumbMcp = landmarks[2];
 
-    const thumbClosed = thumbTip.y > thumbMcp.y;
-    const indexClosed = indexTip.y > indexMcp.y;
-    const middleClosed = middleTip.y > middleMcp.y;
-    const ringClosed = ringTip.y > ringMcp.y;
-    const pinkyClosed = pinkyTip.y > pinkyMcp.y;
-
-    return thumbClosed && indexClosed && middleClosed && ringClosed && pinkyClosed;
+    const indexClosed = indexTip.y > indexPip.y;
+    const middleClosed = middleTip.y > middlePip.y;
+    const ringClosed = ringTip.y > ringPip.y;
+    const pinkyClosed = pinkyTip.y > pinkyPip.y;
+    
+    const closedFingers = [indexClosed, middleClosed, ringClosed, pinkyClosed].filter(Boolean).length;
+    const thumbBent = thumbTip.y > thumbIp.y;
+    
+    const isFist = closedFingers >= 3 || (closedFingers === 4 && thumbBent);
+    
+    return isFist;
 }
 
 function isIndexFingerExtended(landmarks) {
@@ -788,11 +840,60 @@ function isIndexFingerExtended(landmarks) {
     return indexTip.y < indexPip.y && indexPip.y < indexMcp.y;
 }
 
+function drawHandWireframe(landmarks) {
+    if (!handWireframeCtx || handWireframeCanvas.classList.contains('hidden')) return;
+    
+    handWireframeCtx.clearRect(0, 0, handWireframeCanvas.width, handWireframeCanvas.height);
+    handWireframeCtx.strokeStyle = '#00ff00';
+    handWireframeCtx.lineWidth = 2;
+    
+    const flipX = (x) => handWireframeCanvas.width - (x * handWireframeCanvas.width);
+    
+    const connections = [
+        [0, 1], [1, 2], [2, 3], [3, 4],
+        [0, 5], [5, 6], [6, 7], [7, 8],
+        [0, 9], [9, 10], [10, 11], [11, 12],
+        [0, 13], [13, 14], [14, 15], [15, 16],
+        [0, 17], [17, 18], [18, 19], [19, 20],
+        [5, 9], [9, 13], [13, 17]
+    ];
+    
+    connections.forEach(([start, end]) => {
+        if (landmarks[start] && landmarks[end]) {
+            handWireframeCtx.beginPath();
+            handWireframeCtx.moveTo(
+                flipX(landmarks[start].x),
+                landmarks[start].y * handWireframeCanvas.height
+            );
+            handWireframeCtx.lineTo(
+                flipX(landmarks[end].x),
+                landmarks[end].y * handWireframeCanvas.height
+            );
+        handWireframeCtx.stroke();
+    }
+});
+
+landmarks.forEach((landmark, i) => {
+        handWireframeCtx.fillStyle = i === 8 ? '#ff0000' : '#00ff00';
+        handWireframeCtx.beginPath();
+        handWireframeCtx.arc(
+            flipX(landmark.x),
+            landmark.y * handWireframeCanvas.height,
+            3,
+            0,
+            2 * Math.PI
+        );
+        handWireframeCtx.fill();
+    });
+}
+
 function onHandResults(results) {
     if (!noseModeActive || !inputEnabled) return;
 
     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
         const landmarks = results.multiHandLandmarks[0];
+        
+        drawHandWireframe(landmarks);
         const indexFingerTip = landmarks[8];
         const indexFingerExtended = isIndexFingerExtended(landmarks);
         
@@ -831,16 +932,18 @@ function onHandResults(results) {
                 mappedX = smoothedFingerX;
                 mappedY = (smoothedFingerY - offset) / scale;
             }
-            
+
             mappedX = Math.max(0, Math.min(1, mappedX));
             mappedY = Math.max(0, Math.min(1, mappedY));
-            
+
             const canvasX = (1 - mappedX) * canvas.width;
             const canvasY = mappedY * canvas.height;
+            const constrainedX = Math.max(0, Math.min(canvas.width, canvasX));
+            const constrainedY = Math.max(0, Math.min(canvas.height, canvasY));
             
-            updateFingerCursor(canvasX, canvasY);
+            updateFingerCursor(constrainedX, constrainedY);
             noseCursor.classList.remove('hidden');
-            
+
             if (!indexFingerExtended) {
                 if (fingerDrawing) {
                     fingerDrawing = false;
@@ -849,66 +952,70 @@ function onHandResults(results) {
                 ctx.lineWidth = brushSize;
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
-                
+
                 if (currentTool === 'eraser') {
                     ctx.globalCompositeOperation = 'destination-out';
                     ctx.strokeStyle = 'rgba(0,0,0,1)';
                 } else {
                     ctx.globalCompositeOperation = 'source-over';
                     ctx.strokeStyle = currentColor;
+                    ctx.fillStyle = currentColor;
                 }
-                
+
                 const distance = Math.sqrt(
-                    Math.pow(canvasX - lastFingerX, 2) + 
-                    Math.pow(canvasY - lastFingerY, 2)
+                    Math.pow(constrainedX - lastFingerX, 2) + 
+                    Math.pow(constrainedY - lastFingerY, 2)
                 );
-                
+
                 if (!fingerDrawing) {
                     if (lastFingerX === 0 && lastFingerY === 0) {
-                        lastFingerX = canvasX;
-                        lastFingerY = canvasY;
+                        lastFingerX = constrainedX;
+                        lastFingerY = constrainedY;
                     } else if (distance > MIN_DISTANCE_THRESHOLD * Math.min(canvas.width, canvas.height)) {
                         fingerDrawing = true;
                         startTimer();
                         ctx.beginPath();
-                        ctx.moveTo(canvasX, canvasY);
-                        lastFingerX = canvasX;
-                        lastFingerY = canvasY;
+                        ctx.moveTo(constrainedX, constrainedY);
+                        lastFingerX = constrainedX;
+                        lastFingerY = constrainedY;
                     }
                 } else {
-                    const constrainedX = Math.max(0, Math.min(canvas.width, canvasX));
-                    const constrainedY = Math.max(0, Math.min(canvas.height, canvasY));
-                    
                     if (distance > 1) {
                         ctx.lineTo(constrainedX, constrainedY);
                         ctx.stroke();
                         ctx.beginPath();
                         ctx.moveTo(constrainedX, constrainedY);
-                        
+
                         lastFingerX = constrainedX;
                         lastFingerY = constrainedY;
                     }
                 }
-                
+
                 if (currentTool === 'eraser') {
                     ctx.globalCompositeOperation = 'source-over';
                 }
             }
         }
-        
+
         for (const landmarks of results.multiHandLandmarks) {
             const isClosed = isFistClosed(landmarks);
+            
             if (isClosed && !fistWasClosed) {
+                console.log('Fist detected! Changing color...');
                 changeColorOnFistClosed();
                 fistWasClosed = true;
-            } else if (!isClosed) {
+            } else if (!isClosed && fistWasClosed) {
                 fistWasClosed = false;
+                console.log('Fist released');
             }
         }
     } else {
         fingerDrawing = false;
         noseCursor.classList.add('hidden');
         fistWasClosed = false;
+        if (handWireframeCtx) {
+            handWireframeCtx.clearRect(0, 0, handWireframeCanvas.width, handWireframeCanvas.height);
+        }
     }
 }
 
@@ -959,7 +1066,6 @@ function initializeFaceMesh() {
 }
 
 function onFaceMeshResults(results) {
-    // Face mesh is no longer used for drawing, only for potential future features
 }
 
 async function startNoseMode() {
@@ -1000,6 +1106,12 @@ async function startNoseMode() {
         video.srcObject = stream;
         await video.play();
         video.classList.remove('hidden');
+        
+        if (handWireframeCanvas) {
+            handWireframeCanvas.classList.remove('hidden');
+            handWireframeCanvas.width = 200;
+            handWireframeCanvas.height = 150;
+        }
 
         setTimeout(() => {
             updateVideoSize();
@@ -1059,6 +1171,12 @@ function stopNoseMode() {
     }
 
     video.classList.add('hidden');
+    if (handWireframeCanvas) {
+        handWireframeCanvas.classList.add('hidden');
+        if (handWireframeCtx) {
+            handWireframeCtx.clearRect(0, 0, handWireframeCanvas.width, handWireframeCanvas.height);
+        }
+    }
     noseCursor.classList.add('hidden');
     canvas.style.pointerEvents = inputEnabled ? 'auto' : 'none';
 }
@@ -1230,15 +1348,31 @@ function checkHardwareAcceleration() {
             return false;
         }
         
-        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-        if (debugInfo) {
-            const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
-            const vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
-            
-            const isSoftware = renderer.toLowerCase().includes('software') || 
-                               renderer.toLowerCase().includes('swiftshader') ||
-                               renderer.toLowerCase().includes('mesa') ||
-                               vendor.toLowerCase().includes('software');
+        let renderer = null;
+        let vendor = null;
+        
+        try {
+            renderer = gl.getParameter(gl.RENDERER);
+            vendor = gl.getParameter(gl.VENDOR);
+        } catch (e) {
+            const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+            if (debugInfo) {
+                try {
+                    renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+                    vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
+                } catch (e2) {
+                    return true;
+                }
+            }
+        }
+        
+        if (renderer) {
+            const rendererLower = renderer.toLowerCase();
+            const vendorLower = vendor ? vendor.toLowerCase() : '';
+            const isSoftware = rendererLower.includes('software') || 
+                               rendererLower.includes('swiftshader') ||
+                               rendererLower.includes('mesa') ||
+                               vendorLower.includes('software');
             
             return !isSoftware;
         }

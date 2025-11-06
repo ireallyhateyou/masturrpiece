@@ -37,6 +37,10 @@
         <h1 class="app-title">masturrpiece</h1>
         <p class="subtitle">finger paint your chef d'oeuvres, from memory!</p>
         
+        <div class="lore-text hidden" id="loreText">
+            <p>Our museum was robbed! While we're figuring out how to recover our jewels, you will be forced to recreate our masterpieces from memory. You'll have a few seconds to study the painting, then you must draw it from memory using only your finger—tracked by your webcam. Make a fist to cycle through colors extracted from the original painting. Good luck, brave artist!</p>
+        </div>
+        
         <div class="toolbar hidden" id="toolsBar">
             <div class="tool-group">
                 <label for="colorPicker">Color:</label>
@@ -57,10 +61,10 @@
         <div class="gamebar hidden" id="gameBar">
             <div class="tool-group">
                 <button id="startGameBtn" class="btn">Start Challenge</button>
-                <button id="peekBtn" class="btn" disabled>Peek (<span id="peeksLeft">3</span>)</button>
-                <button id="finishBtn" class="btn" disabled>Finish</button>
+                <button id="peekBtn" class="btn hidden" disabled>Peek (<span id="peeksLeft">3</span>)</button>
+                <button id="finishBtn" class="btn hidden" disabled>Finish</button>
             </div>
-            <div class="tool-group">
+            <div class="tool-group hidden" id="timerGroup">
                 <span id="phaseLabel">Ready</span>
                 <div class="timer">
                     <div id="timerBar"></div>
@@ -69,12 +73,13 @@
             </div>
         </div>
 
-        <div class="comparison-section" id="comparisonSection">
+        <div class="comparison-section hidden" id="comparisonSection">
             <div class="canvas-wrapper">
                 <h3>Your Drawing</h3>
                 <div class="canvas-container">
                     <canvas id="canvas"></canvas>
                     <video id="video" autoplay playsinline class="hidden"></video>
+                    <canvas id="handWireframeCanvas" class="hidden"></canvas>
                     <div id="noseCursor" class="nose-cursor hidden"></div>
                 </div>
             </div>
