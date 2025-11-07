@@ -73,12 +73,9 @@ function updateNoseCursor(canvasX, canvasY) {
     if (!noseModeActive) return;
 
     const canvasRect = canvas.getBoundingClientRect();
-    const scaleX = canvasRect.width / canvas.width;
-    const scaleY = canvasRect.height / canvas.height;
-    
     const screenX = canvasRect.left + (canvasX / canvas.width) * canvasRect.width;
     const screenY = canvasRect.top + (canvasY / canvas.height) * canvasRect.height;
-    const brushSizeScaled = brushSize * Math.max(scaleX, scaleY) * 2.5;
+    const brushSizeScaled = brushSize * 3.5;
 
     noseCursor.style.left = screenX + 'px';
     noseCursor.style.top = screenY + 'px';
@@ -852,7 +849,6 @@ function onFaceMeshResults(results) {
     if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
         const landmarks = results.multiFaceLandmarks[0];
         
-        drawFaceWireframe(landmarks);
         const noseTip = landmarks[1];
         
         if (noseTip) {
