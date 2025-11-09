@@ -144,7 +144,14 @@ brushBtn.addEventListener('click', () => {
 });
 
 function startDrawing(e) {
-    if (!inputEnabled) return;
+    if (!inputEnabled) {
+        console.log('startDrawing blocked - inputEnabled:', inputEnabled);
+        return;
+    }
+    if (currentStage !== 1) {
+        console.log('startDrawing blocked - not stage 1, currentStage:', currentStage);
+        return;
+    }
     startTimer();
     isDrawing = true;
     const rect = canvas.getBoundingClientRect();
@@ -152,29 +159,39 @@ function startDrawing(e) {
     const scaleY = canvas.height / rect.height;
     lastX = (e.clientX - rect.left) * scaleX;
     lastY = (e.clientY - rect.top) * scaleY;
+    
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
 }
 
 function draw(e) {
     if (!isDrawing) return;
+    if (!inputEnabled) return;
+    if (currentStage !== 1) return;
 
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
     const currentX = (e.clientX - rect.left) * scaleX;
     const currentY = (e.clientY - rect.top) * scaleY;
-    const radius = ctx.lineWidth / 2;
 
-    ctx.beginPath();
-    ctx.arc(currentX, currentY, radius, 0, Math.PI * 2);
-
+    ctx.lineWidth = brushSize;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
     if (currentTool === 'eraser') {
         ctx.globalCompositeOperation = 'destination-out';
-        ctx.fill();
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.fillStyle = currentColor;
+        ctx.strokeStyle = 'rgba(0,0,0,1)';
     } else {
-        ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = currentColor;
+        ctx.fillStyle = currentColor;
     }
+
+    ctx.lineTo(currentX, currentY);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(currentX, currentY);
 
     lastX = currentX;
     lastY = currentY;
@@ -596,14 +613,16 @@ function startMemorizePhase() {
 async function startDrawPhase() {
     console.log('Starting draw phase, stage:', currentStage);
     
-    const stageNames = ['', 'Draw with cursor!', 'Draw with your hand!', 'Draw with your nose!'];
+    const stageNames = ['', 'Draw with cursor!', 'Draw with your nose!', 'Draw with your hand!'];
     phaseLabel.textContent = stageNames[currentStage] || 'Draw!';
     
     if (currentStage === 1) {
         stopNoseMode();
         stopHandMode();
-        canvas.style.pointerEvents = 'auto';
         setInputEnabled(true);
+        canvas.style.pointerEvents = 'auto';
+        canvas.style.cursor = 'crosshair';
+        console.log('Stage 1 - canvas pointer events:', canvas.style.pointerEvents, 'inputEnabled:', inputEnabled);
         if (mouseStageImage) {
             mouseStageImage.classList.remove('hidden');
         }
@@ -612,15 +631,15 @@ async function startDrawPhase() {
             mouseStageImage.classList.add('hidden');
         }
         if (currentStage === 2) {
-            stopNoseMode();
-            canvas.style.pointerEvents = 'none';
-            setInputEnabled(true);
-            await startHandMode();
-        } else if (currentStage === 3) {
             stopHandMode();
             canvas.style.pointerEvents = 'none';
             setInputEnabled(true);
             await startNoseMode();
+        } else if (currentStage === 3) {
+            stopNoseMode();
+            canvas.style.pointerEvents = 'none';
+            setInputEnabled(true);
+            await startHandMode();
         }
     }
     
@@ -1403,18 +1422,15 @@ const originalSetInputEnabled = setInputEnabled;
 let autoStartingNoseMode = false;
 
 setInputEnabled = function(enabled) {
-    console.log('setInputEnabled called:', enabled, 'gameActive:', gameActive, 'noseModeActive:', noseModeActive);
+    console.log('setInputEnabled called:', enabled, 'gameActive:', gameActive, 'noseModeActive:', noseModeActive, 'handModeActive:', handModeActive);
     originalSetInputEnabled(enabled);
-    if (enabled && gameActive && !noseModeActive) {
-        console.log('Restarting nose mode for draw phase');
-        startNoseMode().catch(err => {
-            console.error('Failed to restart nose mode:', err);
-        });
-    } else if (!enabled && noseModeActive && gameActive) {
-        console.log('Input disabled but keeping nose mode active (memorize phase)');
-    } else if (!enabled && noseModeActive && !gameActive) {
+    if (!enabled && noseModeActive && !gameActive) {
         console.log('Stopping nose mode (game not active)');
         stopNoseMode();
+    }
+    if (!enabled && handModeActive && !gameActive) {
+        console.log('Stopping hand mode (game not active)');
+        stopHandMode();
     }
 };
 
