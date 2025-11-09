@@ -38,7 +38,8 @@
         <p class="subtitle">finger paint your chef d'oeuvres, from memory!</p>
         
         <div class="lore-text hidden" id="loreText">
-            <p>Our museum was robbed! While we're figuring out how to recover our jewels, you will be forced to recreate our masterpieces from memory. You'll have a few seconds to study the painting, then you must draw it from memory using only your finger—tracked by your webcam. Make a fist to cycle through colors extracted from the original painting. Good luck, brave artist!</p>
+            <img src="images/webcam.png" alt="Webcam" class="lore-image" id="webcamImage">
+            <p>Please allow access to your webcam, since part of the twists in this game involves computer vision. Thank you!</p>
         </div>
         
         <div class="toolbar hidden" id="toolsBar">
@@ -65,6 +66,7 @@
                 <button id="finishBtn" class="btn hidden" disabled>Finish</button>
             </div>
             <div class="tool-group hidden" id="timerGroup">
+                <img src="images/mouse.png" alt="Mouse" class="stage-image hidden" id="mouseStageImage">
                 <span id="phaseLabel">Ready</span>
                 <div class="timer">
                     <div id="timerBar"></div>

@@ -233,6 +233,7 @@ const finishBtn = document.getElementById('finishBtn');
 const phaseLabel = document.getElementById('phaseLabel');
 const countdownLabel = document.getElementById('countdownLabel');
 const timerBar = document.getElementById('timerBar');
+const mouseStageImage = document.getElementById('mouseStageImage');
 const referenceTitle = document.getElementById('referenceTitle');
 const referenceWrapper = document.getElementById('referenceWrapper');
 const comparisonSection = document.getElementById('comparisonSection');
@@ -468,7 +469,7 @@ let timerStarted = false;
 
 function setInputEnabled(enabled) {
     inputEnabled = enabled;
-    if (!noseModeActive) {
+    if (!noseModeActive && !handModeActive) {
         canvas.style.pointerEvents = enabled ? 'auto' : 'none';
     }
 }
@@ -509,6 +510,9 @@ function enterIdle() {
     peekBtn.classList.add('hidden');
     finishBtn.classList.add('hidden');
     document.getElementById('timerGroup').classList.add('hidden');
+    if (mouseStageImage) {
+        mouseStageImage.classList.add('hidden');
+    }
     startGameBtn.disabled = false;
     startGameBtn.textContent = 'Start Challenge';
     startGameBtn.style.display = '';
@@ -595,19 +599,29 @@ async function startDrawPhase() {
     const stageNames = ['', 'Draw with cursor!', 'Draw with your hand!', 'Draw with your nose!'];
     phaseLabel.textContent = stageNames[currentStage] || 'Draw!';
     
-    setInputEnabled(true);
-    
     if (currentStage === 1) {
         stopNoseMode();
-        canvas.style.pointerEvents = 'auto';
-    } else     if (currentStage === 2) {
-        stopNoseMode();
-        await startHandMode();
-        canvas.style.pointerEvents = 'none';
-    } else if (currentStage === 3) {
         stopHandMode();
-        await startNoseMode();
-        canvas.style.pointerEvents = 'none';
+        canvas.style.pointerEvents = 'auto';
+        setInputEnabled(true);
+        if (mouseStageImage) {
+            mouseStageImage.classList.remove('hidden');
+        }
+    } else {
+        if (mouseStageImage) {
+            mouseStageImage.classList.add('hidden');
+        }
+        if (currentStage === 2) {
+            stopNoseMode();
+            canvas.style.pointerEvents = 'none';
+            setInputEnabled(true);
+            await startHandMode();
+        } else if (currentStage === 3) {
+            stopHandMode();
+            canvas.style.pointerEvents = 'none';
+            setInputEnabled(true);
+            await startNoseMode();
+        }
     }
     
     peekBtn.disabled = false;
@@ -1410,7 +1424,7 @@ const storyTitle = document.getElementById('storyTitle');
 const storyParagraph = document.getElementById('storyParagraph');
 
 const dialogueScript = [
-    { title: 'The Great Museum Heist', text: 'Our museum was robbed!', image: 'images/museum1.png' },
+    { title: 'The Grand Museum Heist', text: 'Our museum was robbed!', image: 'images/museum1.png' },
     { title: '', text: 'While we\'re figuring out how to recover our jewels...', image: 'images/museum2.png' },
     { title: '', text: '...you will be forced to make our masterpieces (with a few twists)!', image: 'images/museum3.png' },
     { title: '', html: '(by the way, did you know the <a href="https://news.ycombinator.com/item?id=45803302" target="_blank" class="story-link">louvre\'s system password was "louvre"</a>?)' },

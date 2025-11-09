@@ -68,6 +68,20 @@ h1 {
     margin-right: auto;
 }
 
+.lore-image {
+    display: block;
+    max-width: 150px;
+    height: auto;
+    margin: 0 auto 20px auto;
+}
+
+.stage-image {
+    max-width: 40px;
+    height: auto;
+    margin-right: 10px;
+    vertical-align: middle;
+}
+
 .toolbar {
     display: flex;
     flex-wrap: wrap;
