@@ -148,8 +148,9 @@ function startDrawing(e) {
         console.log('startDrawing blocked - inputEnabled:', inputEnabled);
         return;
     }
-    if (currentStage !== 1) {
-        console.log('startDrawing blocked - not stage 1, currentStage:', currentStage);
+    const paintingNumber = currentPaintingIndex + 1;
+    if (paintingNumber !== 1) {
+        console.log('startDrawing blocked - not painting 1, painting:', paintingNumber);
         return;
     }
     startTimer();
@@ -167,7 +168,8 @@ function startDrawing(e) {
 function draw(e) {
     if (!isDrawing) return;
     if (!inputEnabled) return;
-    if (currentStage !== 1) return;
+    const paintingNumber = currentPaintingIndex + 1;
+    if (paintingNumber !== 1) return;
 
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
@@ -260,10 +262,10 @@ let paintingLoaded = false;
 let noseModeActive = false;
 
 const paintings = [
-    { title: 'Mona Lisa', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg/402px-Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg' },
-    { title: 'The Starry Night', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Vincent_van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg/480px-Vincent_van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg' },
-    { title: 'The Scream', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f4/The_Scream.jpg/480px-The_Scream.jpg' },
-    { title: 'Girl with a Pearl Earring', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Meisje_met_de_parel.jpg/480px-Meisje_met_de_parel.jpg' }
+    { title: 'Mona Lisa', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg/500px-Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg' },
+    { title: 'The Starry Night', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/01/Vincent_van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg/960px-Vincent_van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg' },
+    { title: 'The Scream', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f4/The_Scream.jpg/500px-The_Scream.jpg' },
+    { title: 'Girl with a Pearl Earring', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Meisje_met_de_parel.jpg/960px-Meisje_met_de_parel.jpg' }
 ];
 let currentPaintingIndex = 0;
 
@@ -275,6 +277,14 @@ function loadCurrentPainting() {
     paintingImg.style.width = '';
     paintingImg.style.height = '';
     paintingImg.src = src;
+    
+    const paintingNumber = currentPaintingIndex + 1;
+    if (paintingNumber === 1) {
+        desiredAspectRatio = 1.0;
+    } else {
+        desiredAspectRatio = null;
+    }
+    
     paintingImg.onerror = () => {
         console.error('Failed to load painting:', src);
         paintingLoaded = false;
@@ -284,8 +294,13 @@ function loadCurrentPainting() {
 paintingImg.onload = () => {
     console.log('Painting loaded successfully:', paintingImg.src);
     paintingLoaded = true;
-    const imgAspect = paintingImg.naturalWidth / paintingImg.naturalHeight;
-    desiredAspectRatio = imgAspect;
+    const paintingNumber = currentPaintingIndex + 1;
+    if (paintingNumber === 1) {
+        desiredAspectRatio = 1.0;
+    } else {
+        const imgAspect = paintingImg.naturalWidth / paintingImg.naturalHeight;
+        desiredAspectRatio = imgAspect;
+    }
     resizeCanvas();
     paintingImg.style.width = canvas.width + 'px';
     paintingImg.style.height = 'auto';
@@ -475,7 +490,6 @@ function compareWithPainting() {
 const MEMORIZE_MS = 5000;
 const DRAW_MS = 100000;
 let gameActive = false;
-let currentStage = 1;
 let isPeeking = false;
 let peeksLeft = 3;
 let memorizeTimerId = null;
@@ -523,7 +537,29 @@ function enterIdle() {
     referenceTitle.textContent = paintings[currentPaintingIndex]?.title || 'Reference';
     setResultsBarVisible(false);
     comparisonSection.classList.add('hidden');
-    document.getElementById('loreText').classList.remove('hidden');
+    const loreText = document.getElementById('loreText');
+    const loreTextContent = document.getElementById('loreTextContent');
+    const webcamImage = document.getElementById('webcamImage');
+    const mouseImage = document.getElementById('mouseImage');
+    loreText.classList.remove('hidden');
+    const paintingNumber = currentPaintingIndex + 1;
+    if (paintingNumber === 1) {
+        if (webcamImage) webcamImage.classList.add('hidden');
+        if (mouseImage) mouseImage.classList.remove('hidden');
+        loreTextContent.textContent = 'You will be painting with your cursor... for now!';
+    } else if (paintingNumber === 2) {
+        if (webcamImage) webcamImage.classList.remove('hidden');
+        if (mouseImage) mouseImage.classList.add('hidden');
+        loreTextContent.textContent = 'When prompted, please allow access to your webcam, since part of the twists in this game involves computer vision. Thank you!';
+    } else if (paintingNumber === 3) {
+        if (webcamImage) webcamImage.classList.remove('hidden');
+        if (mouseImage) mouseImage.classList.add('hidden');
+        loreTextContent.textContent = 'When prompted, please allow access to your webcam, since part of the twists in this game involves computer vision. Thank you!';
+    } else {
+        if (webcamImage) webcamImage.classList.add('hidden');
+        if (mouseImage) mouseImage.classList.add('hidden');
+        loreTextContent.textContent = 'Draw with your cursor.';
+    }
     peekBtn.classList.add('hidden');
     finishBtn.classList.add('hidden');
     document.getElementById('timerGroup').classList.add('hidden');
@@ -539,7 +575,6 @@ function enterIdle() {
 
 function enterGameReady() {
     console.log('Entering game ready state');
-    currentStage = 1;
     isPeeking = false;
     peeksLeft = 3;
     phaseLabel.textContent = 'Ready';
@@ -611,36 +646,46 @@ function startMemorizePhase() {
 }
 
 async function startDrawPhase() {
-    console.log('Starting draw phase, stage:', currentStage);
+    console.log('Starting draw phase, painting:', currentPaintingIndex + 1);
     
-    const stageNames = ['', 'Draw with cursor!', 'Draw with your nose!', 'Draw with your hand!'];
-    phaseLabel.textContent = stageNames[currentStage] || 'Draw!';
+    const paintingNumber = currentPaintingIndex + 1;
     
-    if (currentStage === 1) {
+    if (paintingNumber === 1) {
+        phaseLabel.textContent = 'Draw with cursor!';
         stopNoseMode();
         stopHandMode();
         setInputEnabled(true);
         canvas.style.pointerEvents = 'auto';
         canvas.style.cursor = 'crosshair';
-        console.log('Stage 1 - canvas pointer events:', canvas.style.pointerEvents, 'inputEnabled:', inputEnabled);
+        console.log('Painting 1 - cursor mode, canvas pointer events:', canvas.style.pointerEvents, 'inputEnabled:', inputEnabled);
         if (mouseStageImage) {
             mouseStageImage.classList.remove('hidden');
         }
-    } else {
+    } else if (paintingNumber === 2) {
+        phaseLabel.textContent = 'Draw with your hand!';
+        stopNoseMode();
         if (mouseStageImage) {
             mouseStageImage.classList.add('hidden');
         }
-        if (currentStage === 2) {
-            stopHandMode();
-            canvas.style.pointerEvents = 'none';
-            setInputEnabled(true);
-            await startNoseMode();
-        } else if (currentStage === 3) {
-            stopNoseMode();
-            canvas.style.pointerEvents = 'none';
-            setInputEnabled(true);
-            await startHandMode();
+        canvas.style.pointerEvents = 'none';
+        setInputEnabled(true);
+        await startHandMode();
+    } else if (paintingNumber === 3) {
+        phaseLabel.textContent = 'Draw with your nose!';
+        stopHandMode();
+        if (mouseStageImage) {
+            mouseStageImage.classList.add('hidden');
         }
+        canvas.style.pointerEvents = 'none';
+        setInputEnabled(true);
+        await startNoseMode();
+    } else {
+        phaseLabel.textContent = 'Draw!';
+        stopNoseMode();
+        stopHandMode();
+        setInputEnabled(true);
+        canvas.style.pointerEvents = 'auto';
+        canvas.style.cursor = 'crosshair';
     }
     
     peekBtn.disabled = false;
@@ -720,17 +765,9 @@ function finishGame() {
 
     const grade = compareWithPainting();
     if (grade !== null) {
-        currentStage++;
-        if (currentStage > 3) {
-            currentStage = 1;
-            currentPaintingIndex = (currentPaintingIndex + 1) % paintings.length;
-        }
-        
-        phaseLabel.textContent = currentStage <= 3 ? 'Stage cleared! Next stage...' : 'Round cleared!';
+        currentPaintingIndex = (currentPaintingIndex + 1) % paintings.length;
+        phaseLabel.textContent = 'Painting cleared! Next painting...';
         setTimeout(() => {
-            if (currentStage === 1) {
-                currentPaintingIndex = (currentPaintingIndex + 1) % paintings.length;
-            }
             setResultsBarVisible(false);
             phaseLabel.textContent = 'Loading next...';
             loadCurrentPainting();
@@ -745,7 +782,6 @@ function finishGame() {
             }, 100);
         }, 1000);
     } else {
-        currentStage = 1;
         startGameBtn.textContent = 'Start Challenge';
         startGameBtn.disabled = false;
         setResultsBarVisible(true);
@@ -770,7 +806,6 @@ startGameBtn.addEventListener('click', async () => {
     startGameBtn.classList.add('hidden');
     gameActive = true;
     enterGameReady();
-    await startNoseMode();
     startMemorizePhase();
 });
 
