@@ -1,6 +1,8 @@
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 let desiredAspectRatio = null;
+let paintingLoaded = false;
+const paintingImg = document.getElementById('monaLisaImg');
 
 function clampZeroToOne(value) {
     if (!Number.isFinite(value)) return 0;
@@ -9,19 +11,40 @@ function clampZeroToOne(value) {
 
 function resizeCanvas() {
     const container = canvas.parentElement;
-    const limitWidth = Math.min(1000, container.clientWidth - 40);
-    const limitHeight = Math.min(750, window.innerHeight - 300);
-    let newWidth = limitWidth;
-    let newHeight = limitHeight;
-
-    if (desiredAspectRatio && desiredAspectRatio > 0) {
+    let newWidth, newHeight;
+    
+    if (paintingLoaded && paintingImg.naturalWidth && paintingImg.naturalHeight && desiredAspectRatio) {
+        const limitWidth = Math.min(paintingImg.naturalWidth, container.clientWidth - 40);
+        const limitHeight = Math.min(paintingImg.naturalHeight, window.innerHeight - 300);
+        
         const containerAspect = limitWidth / limitHeight;
+        
         if (containerAspect > desiredAspectRatio) {
             newHeight = limitHeight;
             newWidth = Math.floor(newHeight * desiredAspectRatio);
         } else {
             newWidth = limitWidth;
             newHeight = Math.floor(newWidth / desiredAspectRatio);
+        }
+        
+        const scale = Math.min(newWidth / paintingImg.naturalWidth, newHeight / paintingImg.naturalHeight);
+        newWidth = Math.floor(paintingImg.naturalWidth * scale);
+        newHeight = Math.floor(paintingImg.naturalHeight * scale);
+    } else {
+        const limitWidth = Math.min(1000, container.clientWidth - 40);
+        const limitHeight = Math.min(750, window.innerHeight - 300);
+        newWidth = limitWidth;
+        newHeight = limitHeight;
+
+        if (desiredAspectRatio && desiredAspectRatio > 0) {
+            const containerAspect = limitWidth / limitHeight;
+            if (containerAspect > desiredAspectRatio) {
+                newHeight = limitHeight;
+                newWidth = Math.floor(newHeight * desiredAspectRatio);
+            } else {
+                newWidth = limitWidth;
+                newHeight = Math.floor(newWidth / desiredAspectRatio);
+            }
         }
     }
 
@@ -97,7 +120,6 @@ const brushSizeSlider = document.getElementById('brushSize');
 const brushSizeValue = document.getElementById('brushSizeValue');
 const clearBtn = document.getElementById('clearBtn');
 const eraserBtn = document.getElementById('eraserBtn');
-const brushBtn = document.getElementById('brushBtn');
 const video = document.getElementById('video');
 const noseCursor = document.getElementById('noseCursor');
 const handWireframeCanvas = document.getElementById('handWireframeCanvas');
@@ -127,21 +149,23 @@ clearBtn.addEventListener('click', () => {
 });
 
 eraserBtn.addEventListener('click', () => {
-    currentTool = 'eraser';
-    eraserBtn.classList.add('active');
-    brushBtn.classList.remove('active');
-    ctx.strokeStyle = '#ffffff';
-    ctx.globalCompositeOperation = 'destination-out';
+    if (currentTool === 'eraser') {
+        switchToBrush();
+    } else {
+        currentTool = 'eraser';
+        eraserBtn.classList.add('active');
+        ctx.strokeStyle = '#ffffff';
+        ctx.globalCompositeOperation = 'destination-out';
+    }
 });
 
-brushBtn.addEventListener('click', () => {
+function switchToBrush() {
     currentTool = 'brush';
-    brushBtn.classList.add('active');
     eraserBtn.classList.remove('active');
     ctx.strokeStyle = currentColor;
     ctx.fillStyle = currentColor;
     ctx.globalCompositeOperation = 'source-over';
-});
+}
 
 function startDrawing(e) {
     if (!inputEnabled) {
@@ -242,7 +266,6 @@ ctx.lineWidth = brushSize;
 ctx.strokeStyle = currentColor;
 ctx.fillStyle = currentColor;
 
-const paintingImg = document.getElementById('monaLisaImg');
 const comparisonResult = document.getElementById('comparisonResult');
 const gameBar = document.getElementById('gameBar');
 const toolsBar = document.getElementById('toolsBar');
@@ -252,13 +275,12 @@ const finishBtn = document.getElementById('finishBtn');
 const phaseLabel = document.getElementById('phaseLabel');
 const countdownLabel = document.getElementById('countdownLabel');
 const timerBar = document.getElementById('timerBar');
-const mouseStageImage = document.getElementById('mouseStageImage');
+const mouseDrawingImage = document.getElementById('mouseDrawingImage');
 const referenceTitle = document.getElementById('referenceTitle');
 const referenceWrapper = document.getElementById('referenceWrapper');
 const comparisonSection = document.getElementById('comparisonSection');
 const resultsBar = document.getElementById('resultsBar');
 
-let paintingLoaded = false;
 let noseModeActive = false;
 
 const paintings = [
@@ -278,7 +300,6 @@ function loadCurrentPainting() {
     paintingImg.style.height = '';
     paintingImg.src = src;
     
-    // Reset aspect ratio - will be set when image loads
     desiredAspectRatio = null;
     
     paintingImg.onerror = () => {
@@ -291,14 +312,43 @@ paintingImg.onload = () => {
     console.log('Painting loaded successfully:', paintingImg.src);
     paintingLoaded = true;
     
-    // Calculate aspect ratio from actual image dimensions
     const imgAspect = paintingImg.naturalWidth / paintingImg.naturalHeight;
     desiredAspectRatio = imgAspect;
     
     console.log('Painting aspect ratio:', desiredAspectRatio, 'Dimensions:', paintingImg.naturalWidth, 'x', paintingImg.naturalHeight);
     
-    resizeCanvas();
-    paintingImg.style.width = canvas.width + 'px';
+    const container = paintingImg.parentElement;
+    const maxWidth = container ? Math.min(paintingImg.naturalWidth, container.clientWidth - 40) : paintingImg.naturalWidth;
+    const maxHeight = Math.min(paintingImg.naturalHeight, window.innerHeight - 300);
+    
+    let displayWidth = maxWidth;
+    let displayHeight = maxWidth / desiredAspectRatio;
+    
+    if (displayHeight > maxHeight) {
+        displayHeight = maxHeight;
+        displayWidth = displayHeight * desiredAspectRatio;
+    }
+    
+    displayWidth = Math.floor(displayWidth);
+    displayHeight = Math.floor(displayHeight);
+    
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = canvas.width;
+    tempCanvas.height = canvas.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    if (canvas.width && canvas.height) {
+        tempCtx.drawImage(canvas, 0, 0);
+    }
+    
+    canvas.width = displayWidth;
+    canvas.height = displayHeight;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (tempCanvas.width && tempCanvas.height) {
+        ctx.drawImage(tempCanvas, 0, 0, tempCanvas.width, tempCanvas.height, 0, 0, canvas.width, canvas.height);
+    }
+    
+    paintingImg.style.width = displayWidth + 'px';
     paintingImg.style.height = 'auto';
 
     setTimeout(() => {
@@ -569,8 +619,8 @@ function enterIdle() {
     peekBtn.classList.add('hidden');
     finishBtn.classList.add('hidden');
     document.getElementById('timerGroup').classList.add('hidden');
-    if (mouseStageImage) {
-        mouseStageImage.classList.add('hidden');
+    if (mouseDrawingImage) {
+        mouseDrawingImage.classList.add('hidden');
     }
     startGameBtn.disabled = false;
     startGameBtn.textContent = 'Start Challenge';
@@ -588,22 +638,22 @@ function enterGameReady() {
     document.getElementById('peeksLeft').textContent = String(peeksLeft);
     updateTimerBar(0);
     showReference(false);
-    gameBar.classList.remove('hidden');
-    gameBar.classList.add('active-game');
+    gameBar.classList.add('hidden');
+    gameBar.classList.remove('active-game');
     referenceTitle.textContent = 'Reference';
     setResultsBarVisible(false);
     peekBtn.disabled = true;
     finishBtn.disabled = true;
-    peekBtn.classList.remove('hidden');
-    finishBtn.classList.remove('hidden');
-    document.getElementById('timerGroup').classList.remove('hidden');
+    peekBtn.classList.add('hidden');
+    finishBtn.classList.add('hidden');
+    document.getElementById('timerGroup').classList.add('hidden');
     toolsBar.classList.add('hidden');
     timerStarted = false;
     timerStartTime = null;
-    comparisonSection.classList.remove('hidden');
+    comparisonSection.classList.add('hidden');
     document.getElementById('loreText').classList.add('hidden');
     startGameBtn.classList.add('hidden');
-    console.log('Game ready - comparison section visible:', !comparisonSection.classList.contains('hidden'));
+    console.log('Game ready - buttons hidden until needed');
 }
 
 function startTeasingPhase() {
@@ -665,8 +715,6 @@ function startTeasingPhase() {
             } else {
                 setTimeout(() => {
                     if (teasingText) teasingText.classList.add('hidden');
-                    if (comparisonSection) comparisonSection.classList.remove('hidden');
-                    if (gameBar) gameBar.classList.remove('hidden');
                     startMemorizePhase();
                 }, 2000);
             }
@@ -684,6 +732,13 @@ function startMemorizePhase() {
     showReference(true);
     
     showPaintingFacts();
+    
+    gameBar.classList.remove('hidden');
+    gameBar.classList.add('active-game');
+    document.getElementById('timerGroup').classList.remove('hidden');
+    peekBtn.classList.add('hidden');
+    finishBtn.classList.add('hidden');
+    comparisonSection.classList.remove('hidden');
     
     countdownLabel.textContent = '5s';
     console.log('Reference should be visible, paintingImg hidden:', paintingImg.classList.contains('hidden'));
@@ -823,14 +878,14 @@ async function startDrawPhase() {
         canvas.style.pointerEvents = 'auto';
         canvas.style.cursor = 'crosshair';
         console.log('Painting 1 - cursor mode, canvas pointer events:', canvas.style.pointerEvents, 'inputEnabled:', inputEnabled);
-        if (mouseStageImage) {
-            mouseStageImage.classList.remove('hidden');
+        if (mouseDrawingImage) {
+            mouseDrawingImage.classList.remove('hidden');
         }
     } else if (paintingNumber === 2) {
         phaseLabel.textContent = 'Draw with your hand!';
         stopNoseMode();
-        if (mouseStageImage) {
-            mouseStageImage.classList.add('hidden');
+        if (mouseDrawingImage) {
+            mouseDrawingImage.classList.add('hidden');
         }
         canvas.style.pointerEvents = 'none';
         setInputEnabled(true);
@@ -838,8 +893,8 @@ async function startDrawPhase() {
     } else if (paintingNumber === 3) {
         phaseLabel.textContent = 'Draw with your nose!';
         stopHandMode();
-        if (mouseStageImage) {
-            mouseStageImage.classList.add('hidden');
+        if (mouseDrawingImage) {
+            mouseDrawingImage.classList.add('hidden');
         }
         canvas.style.pointerEvents = 'none';
         setInputEnabled(true);
@@ -853,6 +908,8 @@ async function startDrawPhase() {
         canvas.style.cursor = 'crosshair';
     }
     
+    peekBtn.classList.remove('hidden');
+    finishBtn.classList.remove('hidden');
     peekBtn.disabled = false;
     finishBtn.disabled = false;
     toolsBar.classList.remove('hidden');
@@ -919,6 +976,8 @@ function finishGame() {
     timerStartTime = null;
     peekBtn.disabled = true;
     finishBtn.disabled = true;
+    peekBtn.classList.add('hidden');
+    finishBtn.classList.add('hidden');
     setInputEnabled(false);
     stopNoseMode();
     stopHandMode();
@@ -1302,7 +1361,6 @@ async function startNoseMode() {
             camWidth = Math.round(480 * canvasAspect);
         }
 
-        // Show webcam access modal
         await showWebcamModal();
         
         const stream = await navigator.mediaDevices.getUserMedia({ 

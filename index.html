@@ -73,7 +73,6 @@
             <div class="tool-group">
                 <button id="clearBtn" class="btn">Clear Canvas</button>
                 <button id="eraserBtn" class="btn">Eraser</button>
-                <button id="brushBtn" class="btn active">Brush</button>
             </div>
         </div>
 
@@ -84,7 +83,6 @@
                 <button id="finishBtn" class="btn hidden" disabled>Finish</button>
             </div>
             <div class="tool-group hidden" id="timerGroup">
-                <img src="images/mouse.png" alt="Mouse" class="stage-image hidden" id="mouseStageImage">
                 <span id="phaseLabel">Ready</span>
                 <div class="timer">
                     <div id="timerBar"></div>
@@ -95,6 +93,9 @@
 
         <div class="comparison-section hidden" id="comparisonSection">
             <div class="canvas-wrapper">
+                <div class="drawing-indicator">
+                    <img src="images/mouse.png" alt="Mouse" class="drawing-icon hidden" id="mouseDrawingImage">
+                </div>
                 <h3>Your Drawing</h3>
                 <div class="canvas-container">
                     <canvas id="canvas"></canvas>
