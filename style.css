@@ -283,13 +283,27 @@ h1 {
     border: 2px solid #ddd;
     border-radius: 4px;
     background: white;
+}
+
+#monaLisaImg {
     max-width: 100%;
+}
+
+#canvas {
+    max-width: none !important;
+    max-height: none !important;
+}
+
+#monaLisaImg {
     height: auto;
 }
 
 #canvas {
     min-width: 500px;
     min-height: 400px;
+    aspect-ratio: unset !important;
+    object-fit: unset !important;
+    box-sizing: border-box !important;
 }
 
 #video {
@@ -353,7 +367,7 @@ h1 {
 }
 
 .hidden {
-    display: none;
+    display: none !important; /* ffs this took me so long to figure out */
 }
 
 .gamebar {

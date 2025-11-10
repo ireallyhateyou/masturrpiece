@@ -10,15 +10,29 @@ function clampZeroToOne(value) {
 }
 
 function resizeCanvas() {
-    const container = canvas.parentElement;
+    const comparisonSection = document.getElementById('comparisonSection');
+    const container = comparisonSection || canvas.parentElement;
+    
+    const windowWidth = window.innerWidth || 1200;
+    const windowHeight = window.innerHeight || 800;
+    
+    let availableWidth = 1000;
+    if (comparisonSection && !comparisonSection.classList.contains('hidden')) {
+        const sectionWidth = comparisonSection.clientWidth || windowWidth;
+        availableWidth = Math.min(1000, sectionWidth - 80);
+    } else {
+        availableWidth = Math.min(1000, windowWidth - 80);
+    }
+    
+    const availableHeight = Math.min(750, windowHeight - 300);
+    
+    const limitWidth = Math.max(500, availableWidth);
+    const limitHeight = Math.max(400, availableHeight);
+    
     let newWidth, newHeight;
     
-    if (paintingLoaded && paintingImg.naturalWidth && paintingImg.naturalHeight && desiredAspectRatio) {
-        const limitWidth = Math.min(paintingImg.naturalWidth, container.clientWidth - 40);
-        const limitHeight = Math.min(paintingImg.naturalHeight, window.innerHeight - 300);
-        
+    if (desiredAspectRatio && desiredAspectRatio > 0) {
         const containerAspect = limitWidth / limitHeight;
-        
         if (containerAspect > desiredAspectRatio) {
             newHeight = limitHeight;
             newWidth = Math.floor(newHeight * desiredAspectRatio);
@@ -26,29 +40,31 @@ function resizeCanvas() {
             newWidth = limitWidth;
             newHeight = Math.floor(newWidth / desiredAspectRatio);
         }
-        
-        const scale = Math.min(newWidth / paintingImg.naturalWidth, newHeight / paintingImg.naturalHeight);
-        newWidth = Math.floor(paintingImg.naturalWidth * scale);
-        newHeight = Math.floor(paintingImg.naturalHeight * scale);
+        if (newWidth < 200) {
+            newWidth = 200;
+            newHeight = Math.floor(newWidth / desiredAspectRatio);
+        }
+        if (newHeight < 200) {
+            newHeight = 200;
+            newWidth = Math.floor(newHeight * desiredAspectRatio);
+        }
+        console.log('Resizing canvas with aspect ratio:', desiredAspectRatio, 'to:', newWidth, 'x', newHeight, 'calculated aspect:', (newWidth / newHeight).toFixed(3));
     } else {
-        const limitWidth = Math.min(1000, container.clientWidth - 40);
-        const limitHeight = Math.min(750, window.innerHeight - 300);
         newWidth = limitWidth;
         newHeight = limitHeight;
-
-        if (desiredAspectRatio && desiredAspectRatio > 0) {
-            const containerAspect = limitWidth / limitHeight;
-            if (containerAspect > desiredAspectRatio) {
-                newHeight = limitHeight;
-                newWidth = Math.floor(newHeight * desiredAspectRatio);
-            } else {
-                newWidth = limitWidth;
-                newHeight = Math.floor(newWidth / desiredAspectRatio);
-            }
-        }
+        console.log('Resizing canvas with default size:', newWidth, 'x', newHeight);
     }
 
-    if (newWidth === canvas.width && newHeight === canvas.height) return;
+    if (newWidth <= 0 || newHeight <= 0) {
+        console.error('Invalid canvas dimensions calculated:', newWidth, 'x', newHeight);
+        newWidth = 1000;
+        newHeight = 750;
+    }
+
+    if (newWidth === canvas.width && newHeight === canvas.height) {
+        console.log('Canvas already correct size, skipping resize');
+        return;
+    }
 
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = canvas.width;
@@ -60,6 +76,15 @@ function resizeCanvas() {
 
     canvas.width = newWidth;
     canvas.height = newHeight;
+    canvas.style.setProperty('width', newWidth + 'px', 'important');
+    canvas.style.setProperty('height', newHeight + 'px', 'important');
+    canvas.style.setProperty('max-width', 'none', 'important');
+    canvas.style.setProperty('max-height', 'none', 'important');
+    canvas.style.setProperty('min-width', 'auto', 'important');
+    canvas.style.setProperty('min-height', 'auto', 'important');
+    canvas.style.setProperty('flex-shrink', '0', 'important');
+    canvas.style.setProperty('flex-grow', '0', 'important');
+    console.log('Canvas set to:', newWidth, 'x', newHeight, 'aspect ratio:', (newWidth / newHeight).toFixed(3));
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     if (tempCanvas.width && tempCanvas.height) {
@@ -146,6 +171,7 @@ brushSizeSlider.addEventListener('input', (e) => {
 clearBtn.addEventListener('click', () => {
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    updateCanvasVisibility();
 });
 
 eraserBtn.addEventListener('click', () => {
@@ -221,6 +247,8 @@ function draw(e) {
 
     lastX = currentX;
     lastY = currentY;
+    
+    updateCanvasVisibility();
 }
 
 function stopDrawing() {
@@ -317,39 +345,31 @@ paintingImg.onload = () => {
     
     console.log('Painting aspect ratio:', desiredAspectRatio, 'Dimensions:', paintingImg.naturalWidth, 'x', paintingImg.naturalHeight);
     
+    resizeCanvas();
+    
     const container = paintingImg.parentElement;
     const maxWidth = container ? Math.min(paintingImg.naturalWidth, container.clientWidth - 40) : paintingImg.naturalWidth;
     const maxHeight = Math.min(paintingImg.naturalHeight, window.innerHeight - 300);
     
-    let displayWidth = maxWidth;
-    let displayHeight = maxWidth / desiredAspectRatio;
+    const maxDisplayWidth = 200;
+    const maxDisplayHeight = 300;
     
-    if (displayHeight > maxHeight) {
-        displayHeight = maxHeight;
+    let displayWidth = maxDisplayWidth;
+    let displayHeight = displayWidth / desiredAspectRatio;
+    
+    if (displayHeight > maxDisplayHeight) {
+        displayHeight = maxDisplayHeight;
         displayWidth = displayHeight * desiredAspectRatio;
     }
     
     displayWidth = Math.floor(displayWidth);
     displayHeight = Math.floor(displayHeight);
     
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = canvas.width;
-    tempCanvas.height = canvas.height;
-    const tempCtx = tempCanvas.getContext('2d');
-    if (canvas.width && canvas.height) {
-        tempCtx.drawImage(canvas, 0, 0);
-    }
-    
-    canvas.width = displayWidth;
-    canvas.height = displayHeight;
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    if (tempCanvas.width && tempCanvas.height) {
-        ctx.drawImage(tempCanvas, 0, 0, tempCanvas.width, tempCanvas.height, 0, 0, canvas.width, canvas.height);
-    }
-    
     paintingImg.style.width = displayWidth + 'px';
     paintingImg.style.height = 'auto';
+    console.log('Reference painting initial size:', displayWidth, 'x', displayHeight);
+    
+    resizeCanvas();
 
     setTimeout(() => {
         extractedColors = extractPrimaryColors(paintingImg);
@@ -555,10 +575,42 @@ function resetCanvas() {
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.strokeStyle = currentTool === 'brush' ? currentColor : '#ffffff';
+    updateCanvasVisibility();
 }
 
 function updateTimerBar(progress) {
     timerBar.style.width = Math.max(0, Math.min(1, progress)) * 100 + '%';
+}
+
+function isCanvasEmpty() {
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    
+    for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const a = data[i + 3];
+        
+        if (a > 0 && (r < 255 || g < 255 || b < 255)) {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+function updateCanvasVisibility() {
+    const canvasWrapper = document.querySelector('.canvas-wrapper');
+    if (canvasWrapper && comparisonSection && !comparisonSection.classList.contains('hidden')) {
+        if (isCanvasEmpty()) {
+            canvasWrapper.classList.add('hidden');
+            gameBar.classList.add('hidden');
+        } else {
+            canvasWrapper.classList.remove('hidden');
+            gameBar.classList.remove('hidden');
+        }
+    }
 }
 
 function showReference(show) {
@@ -729,6 +781,27 @@ function startMemorizePhase() {
     resetCanvas();
     setInputEnabled(false);
     phaseLabel.textContent = 'Memorize';
+    
+    if (paintingLoaded && desiredAspectRatio && desiredAspectRatio > 0) {
+        const maxDisplayWidth = 150;
+        const maxDisplayHeight = 225;
+        
+        let displayWidth = maxDisplayWidth;
+        let displayHeight = displayWidth / desiredAspectRatio;
+        
+        if (displayHeight > maxDisplayHeight) {
+            displayHeight = maxDisplayHeight;
+            displayWidth = displayHeight * desiredAspectRatio;
+        }
+        
+        displayWidth = Math.max(100, Math.floor(displayWidth));
+        displayHeight = Math.max(100, Math.floor(displayHeight));
+        
+        paintingImg.style.width = displayWidth + 'px';
+        paintingImg.style.height = 'auto';
+        console.log('Reference painting resized for memorize phase:', displayWidth, 'x', displayHeight);
+    }
+    
     showReference(true);
     
     showPaintingFacts();
@@ -1283,6 +1356,7 @@ function onFaceMeshResults(results) {
 
                     lastNoseX = constrainedX;
                     lastNoseY = constrainedY;
+                    updateCanvasVisibility();
                 }
             }
 
@@ -1548,6 +1622,7 @@ function onHandResults(results) {
                     
                     lastHandX = constrainedX;
                     lastHandY = constrainedY;
+                    updateCanvasVisibility();
                 }
             }
             
@@ -1589,7 +1664,6 @@ async function startHandMode() {
                 camWidth = Math.round(480 * canvasAspect);
             }
             
-            // Show webcam access modal
             await showWebcamModal();
             
             const stream = await navigator.mediaDevices.getUserMedia({ 
