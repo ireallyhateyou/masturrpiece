@@ -33,6 +33,19 @@
         </div>
     </div>
 
+    <div class="story-modal" id="webcamModal" style="display: none;">
+        <div class="story-content">
+            <div class="story-text">
+                <img src="images/webcam.png" alt="Webcam" class="story-image">
+                <h2 class="story-title">Webcam, Please</h2>
+                <p class="story-paragraph">
+                    We'll need access to your webcam, since part of the twists in this game involves computer vision. Please click "Allow" when prompted by your browser. This is all client-side so we can't use your webcam for anything else. Thank you!!!
+                </p>
+            </div>
+            <button class="btn story-btn" id="webcamModalBtn">Request Access</button>
+        </div>
+    </div>
+
     <div class="container" id="container">
         <h1 class="app-title">masturrpiece</h1>
         <p class="subtitle">paint our chef d'oeuvres, by yourself !</p>
@@ -41,6 +54,10 @@
             <img src="images/webcam.png" alt="Webcam" class="lore-image hidden" id="webcamImage">
             <img src="images/mouse.png" alt="Mouse" class="lore-image hidden" id="mouseImage">
             <p id="loreTextContent">You will be painting with your cursor... for now!</p>
+        </div>
+        
+        <div class="teasing-text hidden" id="teasingText">
+            <p id="teasingContent"></p>
         </div>
         
         <div class="toolbar hidden" id="toolsBar">
@@ -90,6 +107,10 @@
                 <h3 id="referenceTitle">Reference</h3>
                 <div class="reference-container">
                     <img id="monaLisaImg" class="hidden" alt="Reference Painting" crossorigin="anonymous">
+                    <div class="painting-facts hidden" id="paintingFacts">
+                        <h3 id="factsTitle"></h3>
+                        <div id="factsContent"></div>
+                    </div>
                 </div>
             </div>
         </div>

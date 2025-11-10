@@ -75,6 +75,97 @@ h1 {
     margin: 0 auto 20px auto;
 }
 
+.teasing-text {
+    text-align: center;
+    font-size: 24px;
+    font-style: italic;
+    color: #555;
+    margin: 40px auto;
+    max-width: 600px;
+    min-height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.teasing-text p {
+    margin: 0;
+    animation: fadeIn 0.8s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.painting-facts {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    max-width: 400px;
+    align-self: start;
+}
+
+.painting-facts h3 {
+    margin-top: 0;
+    color: #333;
+    font-size: 20px;
+}
+
+.painting-facts #factsContent {
+    color: #666;
+    line-height: 1.6;
+    font-size: 14px;
+}
+
+.painting-facts #factsContent p {
+    margin: 10px 0;
+}
+
+.comparison-section.with-facts {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 20px;
+    align-items: start;
+}
+
+.comparison-section.with-facts .reference-wrapper {
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.comparison-section.with-facts .reference-wrapper.hidden {
+    display: none !important;
+}
+
+.comparison-section.with-facts .reference-container {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 20px !important;
+    align-items: flex-start !important;
+}
+
+.comparison-section.with-facts .reference-container img.hidden {
+    display: none !important;
+}
+
+.comparison-section.with-facts .reference-container img:not(.hidden) {
+    display: block !important;
+    max-width: 50%;
+    height: auto;
+    flex-shrink: 0;
+}
+
+.comparison-section.with-facts .painting-facts {
+    flex: 1;
+    align-self: start;
+}
+
+.comparison-section.with-facts .canvas-wrapper {
+    display: none !important;
+}
+
 .stage-image {
     max-width: 40px;
     height: auto;

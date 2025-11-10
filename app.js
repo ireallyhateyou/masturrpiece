@@ -278,12 +278,8 @@ function loadCurrentPainting() {
     paintingImg.style.height = '';
     paintingImg.src = src;
     
-    const paintingNumber = currentPaintingIndex + 1;
-    if (paintingNumber === 1) {
-        desiredAspectRatio = 1.0;
-    } else {
-        desiredAspectRatio = null;
-    }
+    // Reset aspect ratio - will be set when image loads
+    desiredAspectRatio = null;
     
     paintingImg.onerror = () => {
         console.error('Failed to load painting:', src);
@@ -294,13 +290,13 @@ function loadCurrentPainting() {
 paintingImg.onload = () => {
     console.log('Painting loaded successfully:', paintingImg.src);
     paintingLoaded = true;
-    const paintingNumber = currentPaintingIndex + 1;
-    if (paintingNumber === 1) {
-        desiredAspectRatio = 1.0;
-    } else {
-        const imgAspect = paintingImg.naturalWidth / paintingImg.naturalHeight;
-        desiredAspectRatio = imgAspect;
-    }
+    
+    // Calculate aspect ratio from actual image dimensions
+    const imgAspect = paintingImg.naturalWidth / paintingImg.naturalHeight;
+    desiredAspectRatio = imgAspect;
+    
+    console.log('Painting aspect ratio:', desiredAspectRatio, 'Dimensions:', paintingImg.naturalWidth, 'x', paintingImg.naturalHeight);
+    
     resizeCanvas();
     paintingImg.style.width = canvas.width + 'px';
     paintingImg.style.height = 'auto';
@@ -487,7 +483,7 @@ function compareWithPainting() {
     return letterGrade;
 }
 
-const MEMORIZE_MS = 5000;
+const MEMORIZE_MS = 10000;
 const DRAW_MS = 100000;
 let gameActive = false;
 let isPeeking = false;
@@ -518,7 +514,17 @@ function updateTimerBar(progress) {
 function showReference(show) {
     paintingImg.classList.toggle('hidden', !show);
     referenceWrapper.classList.toggle('hidden', !show);
-    comparisonSection.classList.toggle('single', !show);
+    const canvasWrapper = document.querySelector('.canvas-wrapper');
+    if (canvasWrapper) {
+        canvasWrapper.classList.toggle('hidden', show);
+    }
+    const paintingNumber = currentPaintingIndex + 1;
+    const hasFacts = paintingNumber === 1 && show;
+    if (!hasFacts) {
+        comparisonSection.classList.toggle('single', !show);
+    } else {
+        comparisonSection.classList.remove('single');
+    }
 }
 
 function setResultsBarVisible(visible) {
@@ -584,7 +590,7 @@ function enterGameReady() {
     showReference(false);
     gameBar.classList.remove('hidden');
     gameBar.classList.add('active-game');
-    referenceTitle.textContent = 'Reference (Hidden)';
+    referenceTitle.textContent = 'Reference';
     setResultsBarVisible(false);
     peekBtn.disabled = true;
     finishBtn.disabled = true;
@@ -600,12 +606,85 @@ function enterGameReady() {
     console.log('Game ready - comparison section visible:', !comparisonSection.classList.contains('hidden'));
 }
 
+function startTeasingPhase() {
+    console.log('Starting teasing phase');
+    const teasingText = document.getElementById('teasingText');
+    const teasingContent = document.getElementById('teasingContent');
+    const loreText = document.getElementById('loreText');
+    const canvasWrapper = document.querySelector('.canvas-wrapper');
+    const gameBar = document.getElementById('gameBar');
+    const comparisonSection = document.getElementById('comparisonSection');
+    
+    if (loreText) loreText.classList.add('hidden');
+    if (teasingText) teasingText.classList.remove('hidden');
+    if (canvasWrapper) canvasWrapper.classList.add('hidden');
+    if (gameBar) gameBar.classList.add('hidden');
+    if (comparisonSection) comparisonSection.classList.add('hidden');
+    
+    const paintingNumber = currentPaintingIndex + 1;
+    let teasingLines = [];
+    
+    if (paintingNumber === 1) {
+        // Mona Lisa
+        teasingLines = [
+            'I have been stolen before...',
+            'I am the best in our collection...',
+            'I am...'
+        ];
+    } else if (paintingNumber === 2) {
+        // The Starry Night
+        teasingLines = [
+            'I was painted in a single night...',
+            'I swirl with emotions and dreams...',
+            'I am...'
+        ];
+    } else if (paintingNumber === 3) {
+        // The Scream
+        teasingLines = [
+            'I capture a moment of pure emotion...',
+            'I have been stolen multiple times...',
+            'I am...'
+        ];
+    } else if (paintingNumber === 4) {
+        // Girl with a Pearl Earring
+        teasingLines = [
+            'I am known as the Dutch Mona Lisa...',
+            'My identity remains a mystery...',
+            'I am...'
+        ];
+    }
+    
+    let currentLine = 0;
+    
+    function showNextLine() {
+        if (currentLine < teasingLines.length && teasingContent) {
+            teasingContent.textContent = teasingLines[currentLine];
+            currentLine++;
+            if (currentLine < teasingLines.length) {
+                setTimeout(showNextLine, 2000);
+            } else {
+                setTimeout(() => {
+                    if (teasingText) teasingText.classList.add('hidden');
+                    if (comparisonSection) comparisonSection.classList.remove('hidden');
+                    if (gameBar) gameBar.classList.remove('hidden');
+                    startMemorizePhase();
+                }, 2000);
+            }
+        }
+    }
+    
+    showNextLine();
+}
+
 function startMemorizePhase() {
     console.log('Starting memorize phase');
     resetCanvas();
     setInputEnabled(false);
     phaseLabel.textContent = 'Memorize';
     showReference(true);
+    
+    showPaintingFacts();
+    
     countdownLabel.textContent = '5s';
     console.log('Reference should be visible, paintingImg hidden:', paintingImg.classList.contains('hidden'));
     console.log('Reference wrapper hidden:', referenceWrapper.classList.contains('hidden'));
@@ -640,13 +719,99 @@ function startMemorizePhase() {
             clearInterval(countdownIntervalId);
             countdownIntervalId = null;
         }
+        hidePaintingFacts();
         showReference(false);
         startDrawPhase();
     }, MEMORIZE_MS);
 }
 
+function showPaintingFacts() {
+    const factsSection = document.getElementById('paintingFacts');
+    const factsTitle = document.getElementById('factsTitle');
+    const factsContent = document.getElementById('factsContent');
+    const comparisonSection = document.getElementById('comparisonSection');
+    const paintingNumber = currentPaintingIndex + 1;
+    
+    if (!factsSection || !factsTitle || !factsContent || !comparisonSection) return;
+    
+    let title = '';
+    let factsHTML = '';
+    
+    if (paintingNumber === 1) {
+        // Mona Lisa
+        title = 'Mona Lisa';
+        factsHTML = `
+            <p><strong>Artist:</strong> Leonardo da Vinci</p>
+            <p><strong>Year:</strong> 1503-1519</p>
+            <p><strong>Location:</strong> Louvre Museum, Paris</p>
+            <p><strong>Famous for:</strong> Her enigmatic smile and mysterious identity</p>
+            <p><strong>Fun fact:</strong> Stolen in 1911 by Vincenzo Peruggia, recovered in 1913</p>
+            <p><strong>Value:</strong> Estimated at over $850 million (if it were ever sold)</p>
+        `;
+    } else if (paintingNumber === 2) {
+        // The Starry Night
+        title = 'The Starry Night';
+        factsHTML = `
+            <p><strong>Artist:</strong> Vincent van Gogh</p>
+            <p><strong>Year:</strong> 1889</p>
+            <p><strong>Location:</strong> Museum of Modern Art, New York</p>
+            <p><strong>Famous for:</strong> Its swirling sky and emotional intensity</p>
+            <p><strong>Fun fact:</strong> Painted from memory while van Gogh was in an asylum in Saint-Rémy</p>
+            <p><strong>Value:</strong> Estimated at over $100 million (if it were ever sold)</p>
+        `;
+    } else if (paintingNumber === 3) {
+        // The Scream
+        title = 'The Scream';
+        factsHTML = `
+            <p><strong>Artist:</strong> Edvard Munch</p>
+            <p><strong>Year:</strong> 1893</p>
+            <p><strong>Location:</strong> National Gallery, Oslo</p>
+            <p><strong>Famous for:</strong> Its expression of anxiety and existential dread</p>
+            <p><strong>Fun fact:</strong> Stolen twice (1994 and 2004) and recovered both times</p>
+            <p><strong>Value:</strong> Sold for $119.9 million in 2012 (one of four versions)</p>
+        `;
+    } else if (paintingNumber === 4) {
+        // Girl with a Pearl Earring
+        title = 'Girl with a Pearl Earring';
+        factsHTML = `
+            <p><strong>Artist:</strong> Johannes Vermeer</p>
+            <p><strong>Year:</strong> 1665</p>
+            <p><strong>Location:</strong> Mauritshuis, The Hague</p>
+            <p><strong>Famous for:</strong> Being called "the Dutch Mona Lisa"</p>
+            <p><strong>Fun fact:</strong> The subject's identity is unknown, and the "pearl" is likely a glass bead</p>
+            <p><strong>Value:</strong> Priceless - considered a national treasure of the Netherlands</p>
+        `;
+    }
+    
+    if (title && factsHTML) {
+        factsTitle.textContent = title;
+        factsContent.innerHTML = factsHTML;
+        factsSection.classList.remove('hidden');
+        comparisonSection.classList.add('with-facts');
+        referenceWrapper.classList.remove('hidden');
+        paintingImg.classList.remove('hidden');
+    }
+}
+
+function hidePaintingFacts() {
+    const factsSection = document.getElementById('paintingFacts');
+    const comparisonSection = document.getElementById('comparisonSection');
+    
+    if (factsSection) {
+        factsSection.classList.add('hidden');
+    }
+    if (comparisonSection) {
+        comparisonSection.classList.remove('with-facts');
+    }
+}
+
 async function startDrawPhase() {
     console.log('Starting draw phase, painting:', currentPaintingIndex + 1);
+    
+    const canvasWrapper = document.querySelector('.canvas-wrapper');
+    if (canvasWrapper) {
+        canvasWrapper.classList.remove('hidden');
+    }
     
     const paintingNumber = currentPaintingIndex + 1;
     
@@ -777,7 +942,7 @@ function finishGame() {
                     startGameBtn.disabled = true;
                     startGameBtn.classList.add('hidden');
                     enterGameReady();
-                    startMemorizePhase();
+                    startTeasingPhase();
                 }
             }, 100);
         }, 1000);
@@ -806,7 +971,8 @@ startGameBtn.addEventListener('click', async () => {
     startGameBtn.classList.add('hidden');
     gameActive = true;
     enterGameReady();
-    startMemorizePhase();
+    
+    startTeasingPhase();
 });
 
 peekBtn.addEventListener('click', doPeek);
@@ -1136,6 +1302,9 @@ async function startNoseMode() {
             camWidth = Math.round(480 * canvasAspect);
         }
 
+        // Show webcam access modal
+        await showWebcamModal();
+        
         const stream = await navigator.mediaDevices.getUserMedia({ 
             video: { 
                 facingMode: 'user',
@@ -1361,6 +1530,9 @@ async function startHandMode() {
             } else {
                 camWidth = Math.round(480 * canvasAspect);
             }
+            
+            // Show webcam access modal
+            await showWebcamModal();
             
             const stream = await navigator.mediaDevices.getUserMedia({ 
                 video: { 
@@ -1666,6 +1838,27 @@ function showHardwareAccelerationModal() {
             hwAccelModal.style.display = 'none';
         };
     }
+}
+
+function showWebcamModal() {
+    return new Promise((resolve) => {
+        const webcamModal = document.getElementById('webcamModal');
+        const webcamModalBtn = document.getElementById('webcamModalBtn');
+        
+        if (webcamModal && webcamModalBtn) {
+            webcamModal.style.display = 'flex';
+            
+            const handleClick = () => {
+                webcamModal.style.display = 'none';
+                webcamModalBtn.removeEventListener('click', handleClick);
+                resolve();
+            };
+            
+            webcamModalBtn.addEventListener('click', handleClick);
+        } else {
+            resolve();
+        }
+    });
 }
 
 storyModal.classList.remove('hidden');
