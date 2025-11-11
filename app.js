@@ -135,12 +135,14 @@ function updateNoseCursor(canvasX, canvasY) {
 let isDrawing = false;
 let currentTool = 'brush';
 let currentColor = '#000000';
-let brushSize = 5;
+let brushSize = 3;
 let lastX = 0;
 let lastY = 0;
 let inputEnabled = true;
+let orderedPalette = [];
+let noseModeActive = false;
 
-const colorPicker = document.getElementById('colorPicker');
+const customColorPicker = document.getElementById('customColorPicker');
 const brushSizeSlider = document.getElementById('brushSize');
 const brushSizeValue = document.getElementById('brushSizeValue');
 const clearBtn = document.getElementById('clearBtn');
@@ -154,13 +156,33 @@ if (handWireframeCanvas) {
     handWireframeCtx = handWireframeCanvas.getContext('2d');
 }
 
-colorPicker.addEventListener('change', (e) => {
-    currentColor = e.target.value;
-    if (currentTool === 'brush') {
-        ctx.strokeStyle = currentColor;
-        ctx.fillStyle = currentColor;
-    }
-});
+function updateCustomColorPicker() {
+    if (!customColorPicker) return;
+    
+    const palette = orderedPalette && orderedPalette.length > 0 ? orderedPalette : [];
+    const colors = ['#000000', ...palette, '#FFFFFF'];
+    
+    customColorPicker.innerHTML = '';
+    
+    colors.forEach(color => {
+        const colorSwatch = document.createElement('div');
+        colorSwatch.className = 'color-swatch';
+        if (currentColor === color) {
+            colorSwatch.classList.add('active');
+        }
+        colorSwatch.style.backgroundColor = color;
+        colorSwatch.title = color;
+        colorSwatch.addEventListener('click', () => {
+            currentColor = color;
+            if (currentTool === 'brush') {
+                ctx.strokeStyle = currentColor;
+                ctx.fillStyle = currentColor;
+            }
+            updateCustomColorPicker();
+        });
+        customColorPicker.appendChild(colorSwatch);
+    });
+}
 
 brushSizeSlider.addEventListener('input', (e) => {
     brushSize = parseInt(e.target.value);
@@ -294,6 +316,8 @@ ctx.lineWidth = brushSize;
 ctx.strokeStyle = currentColor;
 ctx.fillStyle = currentColor;
 
+updateCustomColorPicker();
+
 const comparisonResult = document.getElementById('comparisonResult');
 const gameBar = document.getElementById('gameBar');
 const toolsBar = document.getElementById('toolsBar');
@@ -308,8 +332,8 @@ const referenceTitle = document.getElementById('referenceTitle');
 const referenceWrapper = document.getElementById('referenceWrapper');
 const comparisonSection = document.getElementById('comparisonSection');
 const resultsBar = document.getElementById('resultsBar');
-
-let noseModeActive = false;
+const peekOverlay = document.getElementById('peekOverlay');
+const peekOverlayImg = document.getElementById('peekOverlayImg');
 
 const paintings = [
     { title: 'Mona Lisa', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg/500px-Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg' },
@@ -376,6 +400,7 @@ paintingImg.onload = () => {
         orderedPalette = createOrderedPalette(extractedColors);
         paletteIndex = 0;
         console.log('Color extraction complete, palette length:', orderedPalette.length);
+        updateCustomColorPicker();
     }, 0);
 
     if (noseModeActive) {
@@ -692,7 +717,7 @@ function enterGameReady() {
     showReference(false);
     gameBar.classList.add('hidden');
     gameBar.classList.remove('active-game');
-    referenceTitle.textContent = 'Reference';
+    referenceTitle.textContent = paintings[currentPaintingIndex]?.title || 'Reference';
     setResultsBarVisible(false);
     peekBtn.disabled = true;
     finishBtn.disabled = true;
@@ -913,6 +938,7 @@ function showPaintingFacts() {
     
     if (title && factsHTML) {
         factsTitle.textContent = title;
+        referenceTitle.textContent = title;
         factsContent.innerHTML = factsHTML;
         factsSection.classList.remove('hidden');
         comparisonSection.classList.add('with-facts');
@@ -1025,19 +1051,63 @@ function startTimer() {
     }, DRAW_MS);
 }
 
+function updatePeekOverlayPosition() {
+    if (!peekOverlay || peekOverlay.classList.contains('hidden')) return;
+    
+    const canvasRect = canvas.getBoundingClientRect();
+    const canvasAspect = canvas.width / canvas.height;
+    const imgAspect = paintingImg.naturalWidth / paintingImg.naturalHeight;
+    
+    let overlayWidth = canvasRect.width;
+    let overlayHeight = canvasRect.height;
+    
+    if (imgAspect > canvasAspect) {
+        overlayHeight = overlayWidth / imgAspect;
+    } else {
+        overlayWidth = overlayHeight * imgAspect;
+    }
+    
+    peekOverlay.style.width = overlayWidth + 'px';
+    peekOverlay.style.height = overlayHeight + 'px';
+    peekOverlay.style.left = canvasRect.left + (canvasRect.width - overlayWidth) / 2 + 'px';
+    peekOverlay.style.top = canvasRect.top + (canvasRect.height - overlayHeight) / 2 + 'px';
+}
+
 function doPeek() {
     if (peeksLeft <= 0 || isPeeking) return;
     isPeeking = true;
     peeksLeft -= 1;
     document.getElementById('peeksLeft').textContent = String(peeksLeft);
-    showReference(true);
+    
     peekBtn.classList.add('flash');
     setTimeout(() => peekBtn.classList.remove('flash'), 350);
-    setTimeout(() => {
-        showReference(false);
-        isPeeking = false;
-        if (peeksLeft <= 0) peekBtn.disabled = true;
-    }, 2000);
+    
+    if (peekOverlay && peekOverlayImg && paintingLoaded) {
+        peekOverlayImg.src = paintingImg.src;
+        
+        updatePeekOverlayPosition();
+        peekOverlay.classList.remove('hidden');
+        
+        const positionInterval = setInterval(() => {
+            if (peekOverlay.classList.contains('hidden')) {
+                clearInterval(positionInterval);
+                return;
+            }
+            updatePeekOverlayPosition();
+        }, 100);
+        
+        setTimeout(() => {
+            peekOverlay.classList.add('hidden');
+            clearInterval(positionInterval);
+            isPeeking = false;
+            if (peeksLeft <= 0) peekBtn.disabled = true;
+        }, 5000);
+    } else {
+        setTimeout(() => {
+            isPeeking = false;
+            if (peeksLeft <= 0) peekBtn.disabled = true;
+        }, 5000);
+    }
 }
 
 function finishGame() {
@@ -1129,7 +1199,6 @@ let smoothedHandY = 0;
 let firstNoseDetection = true;
 let firstHandDetection = true;
 let extractedColors = [];
-let orderedPalette = [];
 let paletteIndex = 0;
 
 function extractPrimaryColors(img) {
