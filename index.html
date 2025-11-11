@@ -62,8 +62,7 @@
         
         <div class="toolbar hidden" id="toolsBar">
             <div class="tool-group">
-                <label>Color:</label>
-                <div id="customColorPicker" class="custom-color-picker"></div>
+                <button id="colorPickerBtn" class="btn">Color</button>
             </div>
             <div class="tool-group">
                 <label for="brushSize">Brush Size:</label>
@@ -121,6 +120,14 @@
 
         <div class="toolbar" id="resultsBar" style="margin-top: 20px;">
             <div id="comparisonResult" class="comparison-result"></div>
+        </div>
+    </div>
+
+    <div id="colorPickerModal" class="color-picker-modal hidden">
+        <div class="color-picker-content">
+            <h3>Select Color</h3>
+            <div id="customColorPicker" class="custom-color-picker"></div>
+            <button id="closeColorPicker" class="btn">Close</button>
         </div>
     </div>
 

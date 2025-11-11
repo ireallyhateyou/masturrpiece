@@ -143,6 +143,9 @@ let orderedPalette = [];
 let noseModeActive = false;
 
 const customColorPicker = document.getElementById('customColorPicker');
+const colorPickerBtn = document.getElementById('colorPickerBtn');
+const colorPickerModal = document.getElementById('colorPickerModal');
+const closeColorPicker = document.getElementById('closeColorPicker');
 const brushSizeSlider = document.getElementById('brushSize');
 const brushSizeValue = document.getElementById('brushSizeValue');
 const clearBtn = document.getElementById('clearBtn');
@@ -160,15 +163,26 @@ function updateCustomColorPicker() {
     if (!customColorPicker) return;
     
     const palette = orderedPalette && orderedPalette.length > 0 ? orderedPalette : [];
-    const colors = ['#000000', ...palette, '#FFFFFF'];
+    const allColors = ['#000000', ...palette, '#FFFFFF'];
+    
+    const uniqueColors = [];
+    const seenColors = new Set();
+    for (const color of allColors) {
+        if (!seenColors.has(color)) {
+            seenColors.add(color);
+            uniqueColors.push(color);
+        }
+    }
     
     customColorPicker.innerHTML = '';
+    let activeFound = false;
     
-    colors.forEach(color => {
+    uniqueColors.forEach(color => {
         const colorSwatch = document.createElement('div');
         colorSwatch.className = 'color-swatch';
-        if (currentColor === color) {
+        if (currentColor === color && !activeFound) {
             colorSwatch.classList.add('active');
+            activeFound = true;
         }
         colorSwatch.style.backgroundColor = color;
         colorSwatch.title = color;
@@ -179,8 +193,36 @@ function updateCustomColorPicker() {
                 ctx.fillStyle = currentColor;
             }
             updateCustomColorPicker();
+            if (colorPickerModal) {
+                colorPickerModal.classList.add('hidden');
+            }
         });
         customColorPicker.appendChild(colorSwatch);
+    });
+}
+
+if (colorPickerBtn) {
+    colorPickerBtn.addEventListener('click', () => {
+        updateCustomColorPicker();
+        if (colorPickerModal) {
+            colorPickerModal.classList.remove('hidden');
+        }
+    });
+}
+
+if (closeColorPicker) {
+    closeColorPicker.addEventListener('click', () => {
+        if (colorPickerModal) {
+            colorPickerModal.classList.add('hidden');
+        }
+    });
+}
+
+if (colorPickerModal) {
+    colorPickerModal.addEventListener('click', (e) => {
+        if (e.target === colorPickerModal) {
+            colorPickerModal.classList.add('hidden');
+        }
     });
 }
 
@@ -937,7 +979,6 @@ function showPaintingFacts() {
     }
     
     if (title && factsHTML) {
-        factsTitle.textContent = title;
         referenceTitle.textContent = title;
         factsContent.innerHTML = factsHTML;
         factsSection.classList.remove('hidden');
@@ -1228,7 +1269,7 @@ function extractPrimaryColors(img) {
 
     const colors = Array.from(colorMap.entries())
         .sort((a, b) => b[1] - a[1])
-        .slice(0, 12)
+        .slice(0, 24)
         .map(([rgb]) => {
             const [r, g, b] = rgb.split(',').map(Number);
             return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
