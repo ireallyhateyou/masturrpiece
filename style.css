@@ -431,6 +431,19 @@ h1 {
     grid-template-columns: 1fr;
 }
 
+.comparison-section.with-grade {
+    grid-template-columns: 1fr auto;
+}
+
+.grade-wrapper {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-width: 300px;
+    padding: 20px;
+}
+
 .canvas-wrapper, .reference-wrapper {
     display: flex;
     flex-direction: column;

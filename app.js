@@ -400,6 +400,7 @@ const peekOverlayImg = document.getElementById('peekOverlayImg');
 const transitionOverlay = document.getElementById('transitionOverlay');
 const referenceCanvas = document.getElementById('referenceCanvas');
 const gradeDisplay = document.getElementById('gradeDisplay');
+const gradeWrapper = document.getElementById('gradeWrapper');
 
 const paintings = [
     { title: 'Mona Lisa', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg/500px-Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg' },
@@ -615,12 +616,8 @@ function compareWithPainting() {
     const similarityPercent = Math.round(displaySimilarity * 100);
     const letterGrade = getLetterGrade(similarityPercent);
 
-    const message = `Grade: ${letterGrade}`;
-    comparisonResult.innerHTML = `${message}<br>` +
-        `<small style="color: #666;">Color: ${Math.round(scores.colorSimilarity * 100)}% | ` +
-        `Structure: ${Math.round(scores.structuralSimilarity * 100)}% | ` +
-        `Edges: ${Math.round(scores.edgeSimilarity * 100)}%</small>`;
-    return letterGrade;
+    comparisonResult.textContent = '';
+    return { grade: letterGrade, scores };
 }
 
 const MEMORIZE_MS = 10000;
@@ -695,6 +692,16 @@ function showReference(show) {
 
 function setResultsBarVisible(visible) {
     resultsBar.classList.toggle('hidden', !visible);
+    if (gradeWrapper) {
+        gradeWrapper.classList.toggle('hidden', !visible);
+    }
+    if (comparisonSection) {
+        if (visible) {
+            comparisonSection.classList.add('with-grade');
+        } else {
+            comparisonSection.classList.remove('with-grade');
+        }
+    }
 }
 
 function enterIdle() {
@@ -1173,104 +1180,132 @@ function finishGame() {
         yourDrawingTitle.classList.add('hidden');
     }
     
-    if (referenceCanvas && paintingImg && paintingImg.complete) {
-        const refCtx = referenceCanvas.getContext('2d');
-        referenceCanvas.width = canvas.width;
-        referenceCanvas.height = canvas.height;
-        referenceCanvas.style.width = canvas.style.width;
-        referenceCanvas.style.height = canvas.style.height;
+    const canvasContainer = canvas.parentElement;
+    let transitionImg = null;
+    
+    if (paintingImg && paintingImg.complete && canvasContainer) {
+        const wasHidden = canvas.classList.contains('hidden');
+        if (wasHidden) {
+            canvas.classList.remove('hidden');
+            canvas.style.visibility = 'hidden';
+        }
         
-        refCtx.fillStyle = '#ffffff';
-        refCtx.fillRect(0, 0, canvas.width, canvas.height);
-        refCtx.drawImage(paintingImg, 0, 0, canvas.width, canvas.height);
-        referenceCanvas.classList.remove('hidden');
+        const canvasRect = canvas.getBoundingClientRect();
+        const containerRect = canvasContainer.getBoundingClientRect();
+        
+        if (wasHidden) {
+            canvas.style.visibility = '';
+            canvas.classList.add('hidden');
+        }
+        
+        transitionImg = document.createElement('img');
+        transitionImg.src = paintingImg.src;
+        transitionImg.style.position = 'absolute';
+        transitionImg.style.top = (canvasRect.top - containerRect.top) + 'px';
+        transitionImg.style.left = (canvasRect.left - containerRect.left) + 'px';
+        transitionImg.style.width = canvasRect.width + 'px';
+        transitionImg.style.height = canvasRect.height + 'px';
+        transitionImg.style.objectFit = 'contain';
+        transitionImg.style.border = '2px solid #ddd';
+        transitionImg.style.borderRadius = '4px';
+        transitionImg.style.background = 'white';
+        transitionImg.style.zIndex = '100';
+        transitionImg.style.opacity = '1';
+        transitionImg.style.transition = 'opacity 1.5s ease-in-out';
+        transitionImg.style.boxSizing = 'border-box';
+        canvasContainer.appendChild(transitionImg);
     }
     
     setTimeout(() => {
-        if (transitionOverlay) {
-            transitionOverlay.classList.remove('hidden');
-            transitionOverlay.classList.add('active');
-        }
+        canvas.style.opacity = '0';
+        canvas.classList.remove('hidden');
+        canvas.style.transition = 'opacity 1.5s ease-in-out';
+        
+        requestAnimationFrame(() => {
+            if (transitionImg) {
+                transitionImg.style.opacity = '0';
+            }
+            canvas.style.opacity = '1';
+        });
         
         setTimeout(() => {
+            if (transitionImg && transitionImg.parentElement) {
+                transitionImg.parentElement.removeChild(transitionImg);
+            }
+            canvas.style.transition = '';
+            canvas.style.opacity = '';
             if (transitionOverlay) {
-                transitionOverlay.classList.remove('active');
+                transitionOverlay.classList.add('hidden');
             }
             
-            setTimeout(() => {
-                if (referenceCanvas) {
-                    referenceCanvas.classList.add('hidden');
+            if (drawingIndicator) {
+                drawingIndicator.classList.add('hidden');
+            }
+            if (yourDrawingTitle) {
+                yourDrawingTitle.classList.remove('hidden');
+                yourDrawingTitle.textContent = 'Your Drawing';
+            }
+            
+            comparisonSection.classList.remove('hidden');
+            comparisonSection.classList.remove('single');
+            resizeCanvas();
+            
+            const canvasContainerCheck = canvas.parentElement;
+            if (canvasContainerCheck && canvas.width && canvas.height) {
+                canvasContainerCheck.style.minWidth = canvas.width + 'px';
+                canvasContainerCheck.style.minHeight = canvas.height + 'px';
+                canvasContainerCheck.style.width = 'auto';
+                canvasContainerCheck.style.height = 'auto';
+            }
+            
+            const result = compareWithPainting();
+            if (gradeDisplay && result && result.grade) {
+                gradeDisplay.innerHTML = `Grade: ${result.grade}<br>` +
+                    `<small style="color: #666; font-size: 0.3em; font-weight: normal; display: block; margin-top: 10px;">` +
+                    `Color: ${Math.round(result.scores.colorSimilarity * 100)}% | ` +
+                    `Structure: ${Math.round(result.scores.structuralSimilarity * 100)}% | ` +
+                    `Edges: ${Math.round(result.scores.edgeSimilarity * 100)}%</small>`;
+                gradeDisplay.classList.remove('grade-F', 'grade-Dminus', 'grade-D', 'grade-Dplus', 
+                                               'grade-Cminus', 'grade-C', 'grade-Cplus',
+                                               'grade-Bminus', 'grade-B', 'grade-Bplus',
+                                               'grade-Aminus', 'grade-A', 'grade-Aplus');
+                if (!gradeDisplay.classList.contains('grade-display')) {
+                    gradeDisplay.classList.add('grade-display');
                 }
-                canvas.classList.remove('hidden');
-                if (transitionOverlay) {
-                    transitionOverlay.classList.add('hidden');
-                }
-                
-                if (drawingIndicator) {
-                    drawingIndicator.classList.remove('hidden');
-                }
-                if (yourDrawingTitle) {
-                    yourDrawingTitle.classList.remove('hidden');
-                    yourDrawingTitle.textContent = 'Your Drawing';
-                }
-                
-                comparisonSection.classList.remove('hidden');
-                comparisonSection.classList.remove('single');
-                resizeCanvas();
-                
-                const canvasContainer = canvas.parentElement;
-                if (canvasContainer && canvas.width && canvas.height) {
-                    canvasContainer.style.minWidth = canvas.width + 'px';
-                    canvasContainer.style.minHeight = canvas.height + 'px';
-                    canvasContainer.style.width = 'auto';
-                    canvasContainer.style.height = 'auto';
-                }
-                
-                const grade = compareWithPainting();
-                if (gradeDisplay && grade) {
-                    gradeDisplay.textContent = `Grade: ${grade}`;
-                    gradeDisplay.classList.remove('grade-F', 'grade-Dminus', 'grade-D', 'grade-Dplus', 
-                                                   'grade-Cminus', 'grade-C', 'grade-Cplus',
-                                                   'grade-Bminus', 'grade-B', 'grade-Bplus',
-                                                   'grade-Aminus', 'grade-A', 'grade-Aplus');
-                    if (!gradeDisplay.classList.contains('grade-display')) {
-                        gradeDisplay.classList.add('grade-display');
-                    }
-                    const gradeClass = `grade-${grade.replace('+', 'plus').replace('-', 'minus')}`;
-                    gradeDisplay.classList.add(gradeClass);
-                    gradeDisplay.classList.remove('hidden');
-                }
-                setResultsBarVisible(true);
-                phaseLabel.textContent = 'Results';
-                
-                if (grade !== null) {
-                    currentPaintingIndex = (currentPaintingIndex + 1) % paintings.length;
+                const gradeClass = `grade-${result.grade.replace('+', 'plus').replace('-', 'minus')}`;
+                gradeDisplay.classList.add(gradeClass);
+                gradeDisplay.classList.remove('hidden');
+            }
+            setResultsBarVisible(true);
+            phaseLabel.textContent = 'Results';
+            
+            if (result && result.grade !== null) {
+                currentPaintingIndex = (currentPaintingIndex + 1) % paintings.length;
+                setTimeout(() => {
+                    phaseLabel.textContent = 'Painting cleared! Next painting...';
                     setTimeout(() => {
-                        phaseLabel.textContent = 'Painting cleared! Next painting...';
-                        setTimeout(() => {
-                            if (gradeDisplay) {
-                                gradeDisplay.classList.add('hidden');
+                        if (gradeDisplay) {
+                            gradeDisplay.classList.add('hidden');
+                        }
+                        setResultsBarVisible(false);
+                        phaseLabel.textContent = 'Loading next...';
+                        loadCurrentPainting();
+                        const waitForLoad = setInterval(() => {
+                            if (paintingLoaded) {
+                                clearInterval(waitForLoad);
+                                startGameBtn.disabled = true;
+                                startGameBtn.classList.add('hidden');
+                                enterGameReady();
+                                startTeasingPhase();
                             }
-                            setResultsBarVisible(false);
-                            phaseLabel.textContent = 'Loading next...';
-                            loadCurrentPainting();
-                            const waitForLoad = setInterval(() => {
-                                if (paintingLoaded) {
-                                    clearInterval(waitForLoad);
-                                    startGameBtn.disabled = true;
-                                    startGameBtn.classList.add('hidden');
-                                    enterGameReady();
-                                    startTeasingPhase();
-                                }
-                            }, 100);
-                        }, 2000);
-                    }, 5000);
-                } else {
-                    startGameBtn.textContent = 'Start Challenge';
-                    startGameBtn.disabled = false;
-                    enterIdle();
-                }
-            }, 1000);
+                        }, 100);
+                    }, 2000);
+                }, 5000);
+            } else {
+                startGameBtn.textContent = 'Start Challenge';
+                startGameBtn.disabled = false;
+                enterIdle();
+            }
         }, 1500);
     }, 2000);
 }
