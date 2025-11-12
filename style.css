@@ -174,7 +174,7 @@ h1 {
 }
 
 .drawing-icon {
-    max-width: 120px;
+    max-width: 200px;
     height: auto;
     display: block;
 }
@@ -266,6 +266,122 @@ h1 {
     margin-top: 10px;
 }
 
+.reference-wrapper.centered {
+    width: 100%;
+    max-width: 100%;
+}
+
+.reference-wrapper.centered .reference-container {
+    justify-content: center;
+    align-items: center;
+}
+
+.reference-wrapper.centered #monaLisaImg {
+    max-width: 80%;
+    max-height: 80vh;
+    width: auto;
+    height: auto;
+}
+
+.transition-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 500;
+    pointer-events: none;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0);
+    transition: background 1.5s ease-in-out;
+}
+
+.transition-overlay.active {
+    background: rgba(255, 255, 255, 1);
+}
+
+.transition-gradient {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        to right,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.5) 25%,
+        rgba(255, 255, 255, 0.8) 50%,
+        rgba(255, 255, 255, 0.5) 75%,
+        rgba(255, 255, 255, 0) 100%
+    );
+    opacity: 0;
+    animation: gradientSweep 1.5s ease-in-out;
+}
+
+@keyframes gradientSweep {
+    0% {
+        transform: translateX(-100%);
+        opacity: 0;
+    }
+    50% {
+        opacity: 1;
+    }
+    100% {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+.grade-display {
+    text-align: center;
+    font-size: 4em;
+    font-weight: bold;
+    margin: 20px 0;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.grade-display.grade-F {
+    font-family: 'Comic Sans MS', cursive;
+    color: #d32f2f;
+}
+
+.grade-display.grade-Dminus,
+.grade-display.grade-D,
+.grade-display.grade-Dplus {
+    font-family: 'Comic Sans MS', cursive;
+    color: #f57c00;
+}
+
+.grade-display.grade-Cminus,
+.grade-display.grade-C,
+.grade-display.grade-Cplus {
+    font-family: Arial, sans-serif;
+    color: #fbc02d;
+}
+
+.grade-display.grade-Bminus,
+.grade-display.grade-B,
+.grade-display.grade-Bplus {
+    font-family: 'Georgia', serif;
+    color: #388e3c;
+}
+
+.grade-display.grade-Aminus,
+.grade-display.grade-A {
+    font-family: 'Georgia', serif;
+    color: #1976d2;
+}
+
+.grade-display.grade-Aplus {
+    font-family: 'Luxurious Script', cursive;
+    font-size: 5em;
+    color: #7b1fa2;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
 #brushSize {
     width: 150px;
     cursor: pointer;
@@ -330,10 +446,13 @@ h1 {
 .canvas-container, .reference-container {
     display: flex;
     justify-content: center;
+    align-items: center;
     background: #fafafa;
     padding: 20px;
     border-radius: 8px;
     overflow: auto;
+    min-width: fit-content;
+    min-height: fit-content;
 }
 
 #canvas, #monaLisaImg {
@@ -392,6 +511,21 @@ h1 {
 
 .canvas-container {
     position: relative;
+    flex-shrink: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.reference-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 100;
+    pointer-events: none;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    background: white;
 }
 
 .peek-overlay {

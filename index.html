@@ -95,11 +95,15 @@
                 <div class="drawing-indicator">
                     <img src="images/mouse.png" alt="Mouse" class="drawing-icon hidden" id="mouseDrawingImage">
                 </div>
-                <h3>Your Drawing</h3>
+                <h3 id="yourDrawingTitle">Your Drawing</h3>
                 <div class="canvas-container">
                     <canvas id="canvas"></canvas>
+                    <canvas id="referenceCanvas" class="reference-canvas hidden"></canvas>
                     <div id="peekOverlay" class="peek-overlay hidden">
                         <img id="peekOverlayImg" alt="Reference" crossorigin="anonymous">
+                    </div>
+                    <div id="transitionOverlay" class="transition-overlay hidden">
+                        <div class="transition-gradient"></div>
                     </div>
                     <video id="video" autoplay playsinline class="hidden"></video>
                     <canvas id="handWireframeCanvas" class="hidden"></canvas>
@@ -120,6 +124,7 @@
 
         <div class="toolbar" id="resultsBar" style="margin-top: 20px;">
             <div id="comparisonResult" class="comparison-result"></div>
+            <div id="gradeDisplay" class="grade-display hidden"></div>
         </div>
     </div>
 

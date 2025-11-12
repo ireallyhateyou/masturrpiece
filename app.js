@@ -11,7 +11,6 @@ function clampZeroToOne(value) {
 
 function resizeCanvas() {
     const comparisonSection = document.getElementById('comparisonSection');
-    const container = comparisonSection || canvas.parentElement;
     
     const windowWidth = window.innerWidth || 1200;
     const windowHeight = window.innerHeight || 800;
@@ -24,10 +23,10 @@ function resizeCanvas() {
         availableWidth = Math.min(1000, windowWidth - 80);
     }
     
-    const availableHeight = Math.min(750, windowHeight - 300);
+    const availableHeight = Math.min(900, windowHeight - 200);
     
     const limitWidth = Math.max(500, availableWidth);
-    const limitHeight = Math.max(400, availableHeight);
+    const limitHeight = Math.max(500, availableHeight);
     
     let newWidth, newHeight;
     
@@ -48,21 +47,17 @@ function resizeCanvas() {
             newHeight = 200;
             newWidth = Math.floor(newHeight * desiredAspectRatio);
         }
-        console.log('Resizing canvas with aspect ratio:', desiredAspectRatio, 'to:', newWidth, 'x', newHeight, 'calculated aspect:', (newWidth / newHeight).toFixed(3));
     } else {
         newWidth = limitWidth;
         newHeight = limitHeight;
-        console.log('Resizing canvas with default size:', newWidth, 'x', newHeight);
     }
 
     if (newWidth <= 0 || newHeight <= 0) {
-        console.error('Invalid canvas dimensions calculated:', newWidth, 'x', newHeight);
         newWidth = 1000;
         newHeight = 750;
     }
 
     if (newWidth === canvas.width && newHeight === canvas.height) {
-        console.log('Canvas already correct size, skipping resize');
         return;
     }
 
@@ -84,7 +79,13 @@ function resizeCanvas() {
     canvas.style.setProperty('min-height', 'auto', 'important');
     canvas.style.setProperty('flex-shrink', '0', 'important');
     canvas.style.setProperty('flex-grow', '0', 'important');
-    console.log('Canvas set to:', newWidth, 'x', newHeight, 'aspect ratio:', (newWidth / newHeight).toFixed(3));
+    
+    const canvasContainer = canvas.parentElement;
+    if (canvasContainer && canvasContainer.classList.contains('canvas-container')) {
+        canvasContainer.style.minWidth = newWidth + 'px';
+        canvasContainer.style.minHeight = newHeight + 'px';
+    }
+    
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     if (tempCanvas.width && tempCanvas.height) {
@@ -117,9 +118,7 @@ window.addEventListener('resize', () => {
     }
 });
 
-function updateNoseCursor(canvasX, canvasY) {
-    if (!noseModeActive) return;
-
+function updateCursor(canvasX, canvasY) {
     const canvasRect = canvas.getBoundingClientRect();
     const screenX = canvasRect.left + (canvasX / canvas.width) * canvasRect.width;
     const screenY = canvasRect.top + (canvasY / canvas.height) * canvasRect.height;
@@ -130,6 +129,51 @@ function updateNoseCursor(canvasX, canvasY) {
     noseCursor.style.width = brushSizeScaled + 'px';
     noseCursor.style.height = brushSizeScaled + 'px';
     noseCursor.classList.remove('hidden');
+}
+
+function drawHandWireframe(landmarks) {
+    if (!handWireframeCtx || handWireframeCanvas.classList.contains('hidden')) return;
+    
+    handWireframeCtx.clearRect(0, 0, handWireframeCanvas.width, handWireframeCanvas.height);
+    handWireframeCtx.strokeStyle = '#00ff00';
+    handWireframeCtx.lineWidth = 2;
+    
+    const handConnections = [
+        [0, 1], [1, 2], [2, 3], [3, 4],
+        [0, 5], [5, 6], [6, 7], [7, 8],
+        [0, 9], [9, 10], [10, 11], [11, 12],
+        [0, 13], [13, 14], [14, 15], [15, 16],
+        [0, 17], [17, 18], [18, 19], [19, 20],
+        [5, 9], [9, 13], [13, 17]
+    ];
+    
+    handConnections.forEach(([start, end]) => {
+        if (landmarks[start] && landmarks[end]) {
+            handWireframeCtx.beginPath();
+            handWireframeCtx.moveTo(
+                landmarks[start].x * handWireframeCanvas.width,
+                landmarks[start].y * handWireframeCanvas.height
+            );
+            handWireframeCtx.lineTo(
+                landmarks[end].x * handWireframeCanvas.width,
+                landmarks[end].y * handWireframeCanvas.height
+            );
+            handWireframeCtx.stroke();
+        }
+    });
+    
+    if (landmarks[8]) {
+        handWireframeCtx.fillStyle = '#ff0000';
+        handWireframeCtx.beginPath();
+        handWireframeCtx.arc(
+            landmarks[8].x * handWireframeCanvas.width,
+            landmarks[8].y * handWireframeCanvas.height,
+            6,
+            0,
+            2 * Math.PI
+        );
+        handWireframeCtx.fill();
+    }
 }
 
 let isDrawing = false;
@@ -162,17 +206,8 @@ if (handWireframeCanvas) {
 function updateCustomColorPicker() {
     if (!customColorPicker) return;
     
-    const palette = orderedPalette && orderedPalette.length > 0 ? orderedPalette : [];
-    const allColors = ['#000000', ...palette, '#FFFFFF'];
-    
-    const uniqueColors = [];
-    const seenColors = new Set();
-    for (const color of allColors) {
-        if (!seenColors.has(color)) {
-            seenColors.add(color);
-            uniqueColors.push(color);
-        }
-    }
+    const allColors = ['#000000', ...(orderedPalette || []), '#FFFFFF'];
+    const uniqueColors = [...new Set(allColors)];
     
     customColorPicker.innerHTML = '';
     let activeFound = false;
@@ -193,9 +228,7 @@ function updateCustomColorPicker() {
                 ctx.fillStyle = currentColor;
             }
             updateCustomColorPicker();
-            if (colorPickerModal) {
-                colorPickerModal.classList.add('hidden');
-            }
+            colorPickerModal?.classList.add('hidden');
         });
         customColorPicker.appendChild(colorSwatch);
     });
@@ -258,15 +291,7 @@ function switchToBrush() {
 }
 
 function startDrawing(e) {
-    if (!inputEnabled) {
-        console.log('startDrawing blocked - inputEnabled:', inputEnabled);
-        return;
-    }
-    const paintingNumber = currentPaintingIndex + 1;
-    if (paintingNumber !== 1) {
-        console.log('startDrawing blocked - not painting 1, painting:', paintingNumber);
-        return;
-    }
+    if (!inputEnabled || currentPaintingIndex !== 0) return;
     startTimer();
     isDrawing = true;
     const rect = canvas.getBoundingClientRect();
@@ -280,10 +305,7 @@ function startDrawing(e) {
 }
 
 function draw(e) {
-    if (!isDrawing) return;
-    if (!inputEnabled) return;
-    const paintingNumber = currentPaintingIndex + 1;
-    if (paintingNumber !== 1) return;
+    if (!isDrawing || !inputEnabled || currentPaintingIndex !== 0) return;
 
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
@@ -316,9 +338,7 @@ function draw(e) {
 }
 
 function stopDrawing() {
-    if (isDrawing) {
-        isDrawing = false;
-    }
+    isDrawing = false;
 }
 
 canvas.addEventListener('mousedown', startDrawing);
@@ -370,12 +390,16 @@ const phaseLabel = document.getElementById('phaseLabel');
 const countdownLabel = document.getElementById('countdownLabel');
 const timerBar = document.getElementById('timerBar');
 const mouseDrawingImage = document.getElementById('mouseDrawingImage');
+const yourDrawingTitle = document.getElementById('yourDrawingTitle');
 const referenceTitle = document.getElementById('referenceTitle');
 const referenceWrapper = document.getElementById('referenceWrapper');
 const comparisonSection = document.getElementById('comparisonSection');
 const resultsBar = document.getElementById('resultsBar');
 const peekOverlay = document.getElementById('peekOverlay');
 const peekOverlayImg = document.getElementById('peekOverlayImg');
+const transitionOverlay = document.getElementById('transitionOverlay');
+const referenceCanvas = document.getElementById('referenceCanvas');
+const gradeDisplay = document.getElementById('gradeDisplay');
 
 const paintings = [
     { title: 'Mona Lisa', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg/500px-Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg' },
@@ -386,7 +410,6 @@ const paintings = [
 let currentPaintingIndex = 0;
 
 function loadCurrentPainting() {
-    console.log('Loading painting:', paintings[currentPaintingIndex]?.title);
     paintingLoaded = false;
     const { title, src } = paintings[currentPaintingIndex];
     referenceTitle.textContent = title;
@@ -402,48 +425,31 @@ function loadCurrentPainting() {
     };
 }
 
-paintingImg.onload = () => {
-    console.log('Painting loaded successfully:', paintingImg.src);
-    paintingLoaded = true;
+function calculateDisplaySize(aspectRatio, maxWidth = 200, maxHeight = 300) {
+    let displayWidth = maxWidth;
+    let displayHeight = displayWidth / aspectRatio;
     
-    const imgAspect = paintingImg.naturalWidth / paintingImg.naturalHeight;
-    desiredAspectRatio = imgAspect;
-    
-    console.log('Painting aspect ratio:', desiredAspectRatio, 'Dimensions:', paintingImg.naturalWidth, 'x', paintingImg.naturalHeight);
-    
-    resizeCanvas();
-    
-    const container = paintingImg.parentElement;
-    const maxWidth = container ? Math.min(paintingImg.naturalWidth, container.clientWidth - 40) : paintingImg.naturalWidth;
-    const maxHeight = Math.min(paintingImg.naturalHeight, window.innerHeight - 300);
-    
-    const maxDisplayWidth = 200;
-    const maxDisplayHeight = 300;
-    
-    let displayWidth = maxDisplayWidth;
-    let displayHeight = displayWidth / desiredAspectRatio;
-    
-    if (displayHeight > maxDisplayHeight) {
-        displayHeight = maxDisplayHeight;
-        displayWidth = displayHeight * desiredAspectRatio;
+    if (displayHeight > maxHeight) {
+        displayHeight = maxHeight;
+        displayWidth = displayHeight * aspectRatio;
     }
     
-    displayWidth = Math.floor(displayWidth);
-    displayHeight = Math.floor(displayHeight);
+    return { width: Math.floor(displayWidth), height: Math.floor(displayHeight) };
+}
+
+paintingImg.onload = () => {
+    paintingLoaded = true;
+    desiredAspectRatio = paintingImg.naturalWidth / paintingImg.naturalHeight;
+    resizeCanvas();
     
-    paintingImg.style.width = displayWidth + 'px';
+    const { width, height } = calculateDisplaySize(desiredAspectRatio);
+    paintingImg.style.width = width + 'px';
     paintingImg.style.height = 'auto';
-    console.log('Reference painting initial size:', displayWidth, 'x', displayHeight);
-    
     resizeCanvas();
 
-    setTimeout(() => {
-        extractedColors = extractPrimaryColors(paintingImg);
-        orderedPalette = createOrderedPalette(extractedColors);
-        paletteIndex = 0;
-        console.log('Color extraction complete, palette length:', orderedPalette.length);
-        updateCustomColorPicker();
-    }, 0);
+    extractedColors = extractPrimaryColors(paintingImg);
+    orderedPalette = createOrderedPalette(extractedColors);
+    updateCustomColorPicker();
 
     if (noseModeActive) {
         setTimeout(updateVideoSize, 100);
@@ -463,6 +469,7 @@ function getImageDataFromImage(img, width, height) {
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = width;
     tempCanvas.height = height;
+    
     const tempCtx = tempCanvas.getContext('2d');
     const imgAspect = img.naturalWidth / img.naturalHeight;
     const canvasAspect = width / height;
@@ -499,11 +506,10 @@ function compareImages(drawingData, referenceData, width, height) {
         structuralSimilarity: 0
     };
 
-    let totalPixels = width * height;
+    const totalPixels = width * height;
     let colorDiff = 0;
     let luminanceDiff = 0;
     let edgeDiff = 0;
-    let structureDiff = 0;
 
     const drawingEdges = detectEdges(drawingData, width, height);
     const referenceEdges = detectEdges(referenceData, width, height);
@@ -578,18 +584,15 @@ function detectEdges(imageData, width, height) {
 }
 
 function getLetterGrade(percent) {
-    if (percent >= 97) return 'A+';
-    if (percent >= 93) return 'A';
-    if (percent >= 90) return 'A-';
-    if (percent >= 87) return 'B+';
-    if (percent >= 83) return 'B';
-    if (percent >= 80) return 'B-';
-    if (percent >= 77) return 'C+';
-    if (percent >= 73) return 'C';
-    if (percent >= 70) return 'C-';
-    if (percent >= 67) return 'D+';
-    if (percent >= 63) return 'D';
-    if (percent >= 60) return 'D-';
+    const grades = [
+        [97, 'A+'], [93, 'A'], [90, 'A-'],
+        [87, 'B+'], [83, 'B'], [80, 'B-'],
+        [77, 'C+'], [73, 'C'], [70, 'C-'],
+        [67, 'D+'], [63, 'D'], [60, 'D-']
+    ];
+    for (const [threshold, grade] of grades) {
+        if (percent >= threshold) return grade;
+    }
     return 'F';
 }
 
@@ -654,16 +657,10 @@ function isCanvasEmpty() {
     const data = imageData.data;
     
     for (let i = 0; i < data.length; i += 4) {
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-        const a = data[i + 3];
-        
-        if (a > 0 && (r < 255 || g < 255 || b < 255)) {
+        if (data[i + 3] > 0 && (data[i] < 255 || data[i + 1] < 255 || data[i + 2] < 255)) {
             return false;
         }
     }
-    
     return true;
 }
 
@@ -701,7 +698,6 @@ function setResultsBarVisible(visible) {
 }
 
 function enterIdle() {
-    console.log('Entering idle state');
     gameActive = false;
     isPeeking = false;
     setInputEnabled(false);
@@ -741,15 +737,16 @@ function enterIdle() {
     if (mouseDrawingImage) {
         mouseDrawingImage.classList.add('hidden');
     }
+    if (yourDrawingTitle) {
+        yourDrawingTitle.textContent = 'Your Drawing';
+    }
     startGameBtn.disabled = false;
     startGameBtn.textContent = 'Start Challenge';
     startGameBtn.style.display = '';
     startGameBtn.classList.remove('hidden');
-    console.log('Idle state - button visible, comparison hidden');
 }
 
 function enterGameReady() {
-    console.log('Entering game ready state');
     isPeeking = false;
     peeksLeft = 3;
     phaseLabel.textContent = 'Ready';
@@ -772,11 +769,12 @@ function enterGameReady() {
     comparisonSection.classList.add('hidden');
     document.getElementById('loreText').classList.add('hidden');
     startGameBtn.classList.add('hidden');
-    console.log('Game ready - buttons hidden until needed');
+    if (yourDrawingTitle) {
+        yourDrawingTitle.textContent = 'Your Drawing';
+    }
 }
 
 function startTeasingPhase() {
-    console.log('Starting teasing phase');
     const teasingText = document.getElementById('teasingText');
     const teasingContent = document.getElementById('teasingContent');
     const loreText = document.getElementById('loreText');
@@ -794,28 +792,24 @@ function startTeasingPhase() {
     let teasingLines = [];
     
     if (paintingNumber === 1) {
-        // Mona Lisa
         teasingLines = [
             'I have been stolen before...',
             'I am the best in our collection...',
             'I am...'
         ];
     } else if (paintingNumber === 2) {
-        // The Starry Night
         teasingLines = [
             'I was painted in a single night...',
             'I swirl with emotions and dreams...',
             'I am...'
         ];
     } else if (paintingNumber === 3) {
-        // The Scream
         teasingLines = [
             'I capture a moment of pure emotion...',
             'I have been stolen multiple times...',
             'I am...'
         ];
     } else if (paintingNumber === 4) {
-        // Girl with a Pearl Earring
         teasingLines = [
             'I am known as the Dutch Mona Lisa...',
             'My identity remains a mystery...',
@@ -844,29 +838,14 @@ function startTeasingPhase() {
 }
 
 function startMemorizePhase() {
-    console.log('Starting memorize phase');
     resetCanvas();
     setInputEnabled(false);
     phaseLabel.textContent = 'Memorize';
     
     if (paintingLoaded && desiredAspectRatio && desiredAspectRatio > 0) {
-        const maxDisplayWidth = 150;
-        const maxDisplayHeight = 225;
-        
-        let displayWidth = maxDisplayWidth;
-        let displayHeight = displayWidth / desiredAspectRatio;
-        
-        if (displayHeight > maxDisplayHeight) {
-            displayHeight = maxDisplayHeight;
-            displayWidth = displayHeight * desiredAspectRatio;
-        }
-        
-        displayWidth = Math.max(100, Math.floor(displayWidth));
-        displayHeight = Math.max(100, Math.floor(displayHeight));
-        
-        paintingImg.style.width = displayWidth + 'px';
+        const { width, height } = calculateDisplaySize(desiredAspectRatio, 200, 300);
+        paintingImg.style.width = Math.max(100, width) + 'px';
         paintingImg.style.height = 'auto';
-        console.log('Reference painting resized for memorize phase:', displayWidth, 'x', displayHeight);
     }
     
     showReference(true);
@@ -881,9 +860,6 @@ function startMemorizePhase() {
     comparisonSection.classList.remove('hidden');
     
     countdownLabel.textContent = '5s';
-    console.log('Reference should be visible, paintingImg hidden:', paintingImg.classList.contains('hidden'));
-    console.log('Reference wrapper hidden:', referenceWrapper.classList.contains('hidden'));
-
     const start = Date.now();
     updateTimerBar(0);
     
@@ -909,7 +885,6 @@ function startMemorizePhase() {
     }
     
     memorizeTimerId = setTimeout(() => {
-        console.log('Memorize phase complete, starting draw phase');
         if (countdownIntervalId) {
             clearInterval(countdownIntervalId);
             countdownIntervalId = null;
@@ -933,40 +908,36 @@ function showPaintingFacts() {
     let factsHTML = '';
     
     if (paintingNumber === 1) {
-        // Mona Lisa
         title = 'Mona Lisa';
         factsHTML = `
             <p><strong>Artist:</strong> Leonardo da Vinci</p>
             <p><strong>Year:</strong> 1503-1519</p>
             <p><strong>Location:</strong> Louvre Museum, Paris</p>
-            <p><strong>Famous for:</strong> Her enigmatic smile and mysterious identity</p>
-            <p><strong>Fun fact:</strong> Stolen in 1911 by Vincenzo Peruggia, recovered in 1913</p>
-            <p><strong>Value:</strong> Estimated at over $850 million (if it were ever sold)</p>
+            <p><strong>Famous for:</strong> I really don't know why she's famous</p>
+            <p><strong>Fun fact:</strong> Stolen in 1911 by an Italian who wanted the painting back in Italy, recovered in 1913</p>
+            <p><strong>Value:</strong> Estimated at over 8 billion stardust</p>
         `;
     } else if (paintingNumber === 2) {
-        // The Starry Night
         title = 'The Starry Night';
         factsHTML = `
             <p><strong>Artist:</strong> Vincent van Gogh</p>
             <p><strong>Year:</strong> 1889</p>
             <p><strong>Location:</strong> Museum of Modern Art, New York</p>
-            <p><strong>Famous for:</strong> Its swirling sky and emotional intensity</p>
-            <p><strong>Fun fact:</strong> Painted from memory while van Gogh was in an asylum in Saint-Rémy</p>
-            <p><strong>Value:</strong> Estimated at over $100 million (if it were ever sold)</p>
+            <p><strong>Famous for:</strong> The pretty sky</p>
+            <p><strong>Fun fact:</strong> Painted from memory when van Gogh was in an asylum in France</p>
+            <p><strong>Value:</strong> Estimated at over 1 billion stardust</p>
         `;
     } else if (paintingNumber === 3) {
-        // The Scream
         title = 'The Scream';
         factsHTML = `
             <p><strong>Artist:</strong> Edvard Munch</p>
             <p><strong>Year:</strong> 1893</p>
             <p><strong>Location:</strong> National Gallery, Oslo</p>
-            <p><strong>Famous for:</strong> Its expression of anxiety and existential dread</p>
+            <p><strong>Famous for:</strong> the dude screaming his head off</p>
             <p><strong>Fun fact:</strong> Stolen twice (1994 and 2004) and recovered both times</p>
-            <p><strong>Value:</strong> Sold for $119.9 million in 2012 (one of four versions)</p>
+            <p><strong>Value:</strong> Sold for 1 billion stardust (in dollars) in 2012 (one of four versions)</p>
         `;
     } else if (paintingNumber === 4) {
-        // Girl with a Pearl Earring
         title = 'Girl with a Pearl Earring';
         factsHTML = `
             <p><strong>Artist:</strong> Johannes Vermeer</p>
@@ -1001,8 +972,6 @@ function hidePaintingFacts() {
 }
 
 async function startDrawPhase() {
-    console.log('Starting draw phase, painting:', currentPaintingIndex + 1);
-    
     const canvasWrapper = document.querySelector('.canvas-wrapper');
     if (canvasWrapper) {
         canvasWrapper.classList.remove('hidden');
@@ -1011,18 +980,23 @@ async function startDrawPhase() {
     const paintingNumber = currentPaintingIndex + 1;
     
     if (paintingNumber === 1) {
-        phaseLabel.textContent = 'Draw with cursor!';
+        phaseLabel.textContent = '';
+        if (yourDrawingTitle) {
+            yourDrawingTitle.textContent = 'Draw with your mouse';
+        }
         stopNoseMode();
         stopHandMode();
         setInputEnabled(true);
         canvas.style.pointerEvents = 'auto';
         canvas.style.cursor = 'crosshair';
-        console.log('Painting 1 - cursor mode, canvas pointer events:', canvas.style.pointerEvents, 'inputEnabled:', inputEnabled);
         if (mouseDrawingImage) {
             mouseDrawingImage.classList.remove('hidden');
         }
     } else if (paintingNumber === 2) {
-        phaseLabel.textContent = 'Draw with your hand!';
+        phaseLabel.textContent = '';
+        if (yourDrawingTitle) {
+            yourDrawingTitle.textContent = 'Draw with your hand';
+        }
         stopNoseMode();
         if (mouseDrawingImage) {
             mouseDrawingImage.classList.add('hidden');
@@ -1031,7 +1005,10 @@ async function startDrawPhase() {
         setInputEnabled(true);
         await startHandMode();
     } else if (paintingNumber === 3) {
-        phaseLabel.textContent = 'Draw with your nose!';
+        phaseLabel.textContent = '';
+        if (yourDrawingTitle) {
+            yourDrawingTitle.textContent = 'Draw with your nose';
+        }
         stopHandMode();
         if (mouseDrawingImage) {
             mouseDrawingImage.classList.add('hidden');
@@ -1040,7 +1017,10 @@ async function startDrawPhase() {
         setInputEnabled(true);
         await startNoseMode();
     } else {
-        phaseLabel.textContent = 'Draw!';
+        phaseLabel.textContent = '';
+        if (yourDrawingTitle) {
+            yourDrawingTitle.textContent = 'Your Drawing';
+        }
         stopNoseMode();
         stopHandMode();
         setInputEnabled(true);
@@ -1165,43 +1145,139 @@ function finishGame() {
     setInputEnabled(false);
     stopNoseMode();
     stopHandMode();
-    showReference(true);
-    phaseLabel.textContent = 'Results';
+    toolsBar.classList.add('hidden');
+    phaseLabel.textContent = '';
     countdownLabel.textContent = '';
     updateTimerBar(1);
-    toolsBar.classList.add('hidden');
-
-    const grade = compareWithPainting();
-    if (grade !== null) {
-        currentPaintingIndex = (currentPaintingIndex + 1) % paintings.length;
-        phaseLabel.textContent = 'Painting cleared! Next painting...';
-        setTimeout(() => {
-            setResultsBarVisible(false);
-            phaseLabel.textContent = 'Loading next...';
-            loadCurrentPainting();
-            const waitForLoad = setInterval(() => {
-                if (paintingLoaded) {
-                    clearInterval(waitForLoad);
-                    startGameBtn.disabled = true;
-                    startGameBtn.classList.add('hidden');
-                    enterGameReady();
-                    startTeasingPhase();
-                }
-            }, 100);
-        }, 1000);
-    } else {
-        startGameBtn.textContent = 'Start Challenge';
-        startGameBtn.disabled = false;
-        setResultsBarVisible(true);
-        enterIdle();
+    
+    if (gradeDisplay) {
+        gradeDisplay.classList.add('hidden');
     }
+    if (transitionOverlay) {
+        transitionOverlay.classList.add('hidden');
+    }
+    
+    referenceWrapper.classList.add('hidden');
+    const canvasWrapper = document.querySelector('.canvas-wrapper');
+    if (canvasWrapper) {
+        canvasWrapper.classList.remove('hidden');
+    }
+    
+    canvas.classList.add('hidden');
+    
+    const drawingIndicator = document.querySelector('.drawing-indicator');
+    if (drawingIndicator) {
+        drawingIndicator.classList.add('hidden');
+    }
+    if (yourDrawingTitle) {
+        yourDrawingTitle.classList.add('hidden');
+    }
+    
+    if (referenceCanvas && paintingImg && paintingImg.complete) {
+        const refCtx = referenceCanvas.getContext('2d');
+        referenceCanvas.width = canvas.width;
+        referenceCanvas.height = canvas.height;
+        referenceCanvas.style.width = canvas.style.width;
+        referenceCanvas.style.height = canvas.style.height;
+        
+        refCtx.fillStyle = '#ffffff';
+        refCtx.fillRect(0, 0, canvas.width, canvas.height);
+        refCtx.drawImage(paintingImg, 0, 0, canvas.width, canvas.height);
+        referenceCanvas.classList.remove('hidden');
+    }
+    
+    setTimeout(() => {
+        if (transitionOverlay) {
+            transitionOverlay.classList.remove('hidden');
+            transitionOverlay.classList.add('active');
+        }
+        
+        setTimeout(() => {
+            if (transitionOverlay) {
+                transitionOverlay.classList.remove('active');
+            }
+            
+            setTimeout(() => {
+                if (referenceCanvas) {
+                    referenceCanvas.classList.add('hidden');
+                }
+                canvas.classList.remove('hidden');
+                if (transitionOverlay) {
+                    transitionOverlay.classList.add('hidden');
+                }
+                
+                if (drawingIndicator) {
+                    drawingIndicator.classList.remove('hidden');
+                }
+                if (yourDrawingTitle) {
+                    yourDrawingTitle.classList.remove('hidden');
+                    yourDrawingTitle.textContent = 'Your Drawing';
+                }
+                
+                comparisonSection.classList.remove('hidden');
+                comparisonSection.classList.remove('single');
+                resizeCanvas();
+                
+                const canvasContainer = canvas.parentElement;
+                if (canvasContainer && canvas.width && canvas.height) {
+                    canvasContainer.style.minWidth = canvas.width + 'px';
+                    canvasContainer.style.minHeight = canvas.height + 'px';
+                    canvasContainer.style.width = 'auto';
+                    canvasContainer.style.height = 'auto';
+                }
+                
+                const grade = compareWithPainting();
+                if (gradeDisplay && grade) {
+                    gradeDisplay.textContent = `Grade: ${grade}`;
+                    gradeDisplay.classList.remove('grade-F', 'grade-Dminus', 'grade-D', 'grade-Dplus', 
+                                                   'grade-Cminus', 'grade-C', 'grade-Cplus',
+                                                   'grade-Bminus', 'grade-B', 'grade-Bplus',
+                                                   'grade-Aminus', 'grade-A', 'grade-Aplus');
+                    if (!gradeDisplay.classList.contains('grade-display')) {
+                        gradeDisplay.classList.add('grade-display');
+                    }
+                    const gradeClass = `grade-${grade.replace('+', 'plus').replace('-', 'minus')}`;
+                    gradeDisplay.classList.add(gradeClass);
+                    gradeDisplay.classList.remove('hidden');
+                }
+                setResultsBarVisible(true);
+                phaseLabel.textContent = 'Results';
+                
+                if (grade !== null) {
+                    currentPaintingIndex = (currentPaintingIndex + 1) % paintings.length;
+                    setTimeout(() => {
+                        phaseLabel.textContent = 'Painting cleared! Next painting...';
+                        setTimeout(() => {
+                            if (gradeDisplay) {
+                                gradeDisplay.classList.add('hidden');
+                            }
+                            setResultsBarVisible(false);
+                            phaseLabel.textContent = 'Loading next...';
+                            loadCurrentPainting();
+                            const waitForLoad = setInterval(() => {
+                                if (paintingLoaded) {
+                                    clearInterval(waitForLoad);
+                                    startGameBtn.disabled = true;
+                                    startGameBtn.classList.add('hidden');
+                                    enterGameReady();
+                                    startTeasingPhase();
+                                }
+                            }, 100);
+                        }, 2000);
+                    }, 5000);
+                } else {
+                    startGameBtn.textContent = 'Start Challenge';
+                    startGameBtn.disabled = false;
+                    enterIdle();
+                }
+            }, 1000);
+        }, 1500);
+    }, 2000);
 }
 
 startGameBtn.addEventListener('click', async () => {
-    console.log('Start button clicked, paintingLoaded:', paintingLoaded);
     if (!paintingLoaded) {
         phaseLabel.textContent = 'Loading reference...';
-        console.log('Painting not loaded yet');
         return;
     }
     
@@ -1210,7 +1286,6 @@ startGameBtn.addEventListener('click', async () => {
         return;
     }
     
-    console.log('Starting game...');
     startGameBtn.classList.add('hidden');
     gameActive = true;
     enterGameReady();
@@ -1240,7 +1315,6 @@ let smoothedHandY = 0;
 let firstNoseDetection = true;
 let firstHandDetection = true;
 let extractedColors = [];
-let paletteIndex = 0;
 
 function extractPrimaryColors(img) {
     const tempCanvas = document.createElement('canvas');
@@ -1302,61 +1376,6 @@ function createOrderedPalette(colors) {
     return ordered;
 }
 
-
-function drawFaceWireframe(landmarks) {
-    if (!handWireframeCtx || handWireframeCanvas.classList.contains('hidden')) return;
-    
-    handWireframeCtx.clearRect(0, 0, handWireframeCanvas.width, handWireframeCanvas.height);
-    handWireframeCtx.strokeStyle = '#00ff00';
-    handWireframeCtx.lineWidth = 1;
-    
-    const faceConnections = [
-        [10, 338], [151, 337], [9, 10], [10, 151],
-        [151, 9], [9, 107], [107, 55], [55, 65],
-        [65, 52], [52, 53], [53, 46], [46, 1],
-        [1, 2], [2, 3], [3, 4], [4, 5],
-        [5, 6], [6, 7], [7, 8], [8, 9],
-        [10, 151], [151, 337], [337, 299], [299, 333],
-        [333, 298], [298, 301], [301, 368], [368, 264],
-        [264, 447], [447, 366], [366, 401], [401, 435],
-        [435, 410], [410, 454], [454, 323], [323, 361],
-        [361, 288], [288, 397], [397, 365], [365, 379],
-        [379, 378], [378, 400], [400, 377], [377, 152],
-        [152, 148], [148, 176], [176, 149], [149, 150],
-        [150, 136], [136, 172], [172, 58], [58, 132],
-        [132, 93], [93, 234], [234, 127], [127, 162],
-        [162, 21], [21, 54], [54, 103], [103, 67],
-        [67, 109], [109, 10]
-    ];
-    
-    faceConnections.forEach(([start, end]) => {
-        if (landmarks[start] && landmarks[end]) {
-            handWireframeCtx.beginPath();
-            handWireframeCtx.moveTo(
-                landmarks[start].x * handWireframeCanvas.width,
-                landmarks[start].y * handWireframeCanvas.height
-            );
-            handWireframeCtx.lineTo(
-                landmarks[end].x * handWireframeCanvas.width,
-                landmarks[end].y * handWireframeCanvas.height
-            );
-            handWireframeCtx.stroke();
-        }
-    });
-    
-    if (landmarks[1]) {
-        handWireframeCtx.fillStyle = '#ff0000';
-        handWireframeCtx.beginPath();
-        handWireframeCtx.arc(
-            landmarks[1].x * handWireframeCanvas.width,
-            landmarks[1].y * handWireframeCanvas.height,
-            5,
-            0,
-            2 * Math.PI
-        );
-        handWireframeCtx.fill();
-    }
-}
 
 function drawNoseDot(noseTip) {
     if (!handWireframeCtx || handWireframeCanvas.classList.contains('hidden') || !noseTip) return;
@@ -1474,7 +1493,7 @@ function onFaceMeshResults(results) {
                 ctx.globalCompositeOperation = 'source-over';
             }
 
-            updateNoseCursor(constrainedX, constrainedY);
+            if (noseModeActive) updateCursor(constrainedX, constrainedY);
         }
     } else {
         noseDrawing = false;
@@ -1485,6 +1504,18 @@ function onFaceMeshResults(results) {
     }
 }
 
+
+function calculateCameraSize() {
+    const canvasAspect = canvas.width / canvas.height;
+    let camWidth = 640;
+    let camHeight = 480;
+    if (canvasAspect > (640 / 480)) {
+        camHeight = Math.round(640 / canvasAspect);
+    } else {
+        camWidth = Math.round(480 * canvasAspect);
+    }
+    return { camWidth, camHeight };
+}
 
 function initializeFaceMesh() {
     if (typeof FaceMesh === 'undefined') {
@@ -1512,16 +1543,7 @@ function initializeFaceMesh() {
 }
 
 async function startNoseMode() {
-    console.log('startNoseMode called, gameActive:', gameActive);
-    if (noseModeActive) {
-        console.log('Nose mode already active, returning');
-        return;
-    }
-
-    if (!gameActive) {
-        console.log('Game not active, not starting nose mode');
-        return;
-    }
+    if (noseModeActive || !gameActive) return;
 
     noseModeActive = true;
 
@@ -1536,15 +1558,7 @@ async function startNoseMode() {
             initializeFaceMesh();
         }
 
-        const canvasAspect = canvas.width / canvas.height;
-        let camWidth = 640;
-        let camHeight = 480;
-        if (canvasAspect > (640 / 480)) {
-            camHeight = Math.round(640 / canvasAspect);
-        } else {
-            camWidth = Math.round(480 * canvasAspect);
-        }
-
+        const { camWidth, camHeight } = calculateCameraSize();
         await showWebcamModal();
         
         const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -1599,11 +1613,6 @@ async function startNoseMode() {
         lastNoseX = 0;
         lastNoseY = 0;
         firstNoseDetection = true;
-
-        window.DEBUG_NOSE = true;
-        console.log('Nose mode started. Debug enabled. Type DEBUG_NOSE=false to disable.');
-        console.log('Camera dimensions:', { camWidth, camHeight });
-        console.log('Canvas dimensions:', { width: canvas.width, height: canvas.height });
     } catch (err) {
         noseModeActive = false;
         console.error('Error accessing camera:', err);
@@ -1670,9 +1679,11 @@ function onHandResults(results) {
         const landmarks = results.multiHandLandmarks[0];
         const indexFinger = landmarks[8];
         
+        drawHandWireframe(landmarks);
+        
         if (indexFinger) {
             let handX = indexFinger.x;
-            let handY = indexFinger.y;
+            let handY = 1 - indexFinger.y;
             
             handX = Math.max(0, Math.min(1, handX));
             handY = Math.max(0, Math.min(1, handY));
@@ -1691,7 +1702,7 @@ function onHandResults(results) {
             const constrainedX = Math.max(0, Math.min(canvas.width, canvasX));
             const constrainedY = Math.max(0, Math.min(canvas.height, canvasY));
             
-            updateNoseCursor(constrainedX, constrainedY);
+            if (handModeActive) updateCursor(constrainedX, constrainedY);
             
             ctx.lineWidth = brushSize;
             ctx.lineCap = 'round';
@@ -1743,6 +1754,9 @@ function onHandResults(results) {
     } else {
         handDrawing = false;
         noseCursor.classList.add('hidden');
+        if (handWireframeCtx && handWireframeCanvas) {
+            handWireframeCtx.clearRect(0, 0, handWireframeCanvas.width, handWireframeCanvas.height);
+        }
     }
 }
 
@@ -1765,15 +1779,7 @@ async function startHandMode() {
         }
         
         if (!camera) {
-            const canvasAspect = canvas.width / canvas.height;
-            let camWidth = 640;
-            let camHeight = 480;
-            if (canvasAspect > (640 / 480)) {
-                camHeight = Math.round(640 / canvasAspect);
-            } else {
-                camWidth = Math.round(480 * canvasAspect);
-            }
-            
+            const { camWidth, camHeight } = calculateCameraSize();
             await showWebcamModal();
             
             const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -1868,18 +1874,12 @@ function stopHandMode() {
 }
 
 const originalSetInputEnabled = setInputEnabled;
-let autoStartingNoseMode = false;
 
 setInputEnabled = function(enabled) {
-    console.log('setInputEnabled called:', enabled, 'gameActive:', gameActive, 'noseModeActive:', noseModeActive, 'handModeActive:', handModeActive);
     originalSetInputEnabled(enabled);
-    if (!enabled && noseModeActive && !gameActive) {
-        console.log('Stopping nose mode (game not active)');
-        stopNoseMode();
-    }
-    if (!enabled && handModeActive && !gameActive) {
-        console.log('Stopping hand mode (game not active)');
-        stopHandMode();
+    if (!enabled && !gameActive) {
+        if (noseModeActive) stopNoseMode();
+        if (handModeActive) stopHandMode();
     }
 };
 
@@ -1887,6 +1887,7 @@ const storyModal = document.getElementById('storyModal');
 const storyNextBtn = document.getElementById('storyNextBtn');
 const storyTitle = document.getElementById('storyTitle');
 const storyParagraph = document.getElementById('storyParagraph');
+const storyImage = document.getElementById('storyImage');
 
 const dialogueScript = [
     { title: 'The Grand Museum Heist', text: 'Our museum was robbed!', image: 'images/museum1.png' },
@@ -2108,10 +2109,3 @@ showDialogue(0);
 
 loadCurrentPainting();
 enterIdle();
-
-setTimeout(() => {
-    console.log('After load - paintingLoaded:', paintingLoaded);
-    console.log('Button text:', startGameBtn.textContent);
-    console.log('Button hidden:', startGameBtn.classList.contains('hidden'));
-    console.log('Button display:', startGameBtn.style.display);
-}, 1000);
