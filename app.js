@@ -151,11 +151,11 @@ function drawHandWireframe(landmarks) {
         if (landmarks[start] && landmarks[end]) {
             handWireframeCtx.beginPath();
             handWireframeCtx.moveTo(
-                landmarks[start].x * handWireframeCanvas.width,
+                (1 - landmarks[start].x) * handWireframeCanvas.width,
                 landmarks[start].y * handWireframeCanvas.height
             );
             handWireframeCtx.lineTo(
-                landmarks[end].x * handWireframeCanvas.width,
+                (1 - landmarks[end].x) * handWireframeCanvas.width,
                 landmarks[end].y * handWireframeCanvas.height
             );
             handWireframeCtx.stroke();
@@ -166,7 +166,7 @@ function drawHandWireframe(landmarks) {
         handWireframeCtx.fillStyle = '#ff0000';
         handWireframeCtx.beginPath();
         handWireframeCtx.arc(
-            landmarks[8].x * handWireframeCanvas.width,
+            (1 - landmarks[8].x) * handWireframeCanvas.width,
             landmarks[8].y * handWireframeCanvas.height,
             6,
             0,
@@ -390,6 +390,8 @@ const phaseLabel = document.getElementById('phaseLabel');
 const countdownLabel = document.getElementById('countdownLabel');
 const timerBar = document.getElementById('timerBar');
 const mouseDrawingImage = document.getElementById('mouseDrawingImage');
+const faceDrawingImage = document.getElementById('faceDrawingImage');
+const eyeDrawingImage = document.getElementById('eyeDrawingImage');
 const yourDrawingTitle = document.getElementById('yourDrawingTitle');
 const referenceTitle = document.getElementById('referenceTitle');
 const referenceWrapper = document.getElementById('referenceWrapper');
@@ -401,6 +403,10 @@ const transitionOverlay = document.getElementById('transitionOverlay');
 const referenceCanvas = document.getElementById('referenceCanvas');
 const gradeDisplay = document.getElementById('gradeDisplay');
 const gradeWrapper = document.getElementById('gradeWrapper');
+const finalResultsModal = document.getElementById('finalResultsModal');
+const gpaDisplay = document.getElementById('gpaDisplay');
+const paintingGallery = document.getElementById('paintingGallery');
+const restartGameBtn = document.getElementById('restartGameBtn');
 
 const paintings = [
     { title: 'Mona Lisa', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg/500px-Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg' },
@@ -408,7 +414,10 @@ const paintings = [
     { title: 'The Scream', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f4/The_Scream.jpg/500px-The_Scream.jpg' },
     { title: 'Girl with a Pearl Earring', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Meisje_met_de_parel.jpg/960px-Meisje_met_de_parel.jpg' }
 ];
+
 let currentPaintingIndex = 0;
+let completedPaintings = [];
+let allGrades = [];
 
 function loadCurrentPainting() {
     paintingLoaded = false;
@@ -597,6 +606,23 @@ function getLetterGrade(percent) {
     return 'F';
 }
 
+function gradeToGPA(grade) {
+    const gpaMap = {
+        'A+': 4.0, 'A': 4.0, 'A-': 3.7,
+        'B+': 3.3, 'B': 3.0, 'B-': 2.7,
+        'C+': 2.3, 'C': 2.0, 'C-': 1.7,
+        'D+': 1.3, 'D': 1.0, 'D-': 0.7,
+        'F': 0.0
+    };
+    return gpaMap[grade] || 0.0;
+}
+
+function calculateGPA() {
+    if (allGrades.length === 0) return 0.0;
+    const totalGPA = allGrades.reduce((sum, grade) => sum + gradeToGPA(grade), 0);
+    return (totalGPA / allGrades.length).toFixed(2);
+}
+
 function compareWithPainting() {
     if (!paintingLoaded) {
         comparisonResult.textContent = 'Loading painting...';
@@ -743,6 +769,9 @@ function enterIdle() {
     document.getElementById('timerGroup').classList.add('hidden');
     if (mouseDrawingImage) {
         mouseDrawingImage.classList.add('hidden');
+    }
+    if (faceDrawingImage) {
+        faceDrawingImage.classList.add('hidden');
     }
     if (yourDrawingTitle) {
         yourDrawingTitle.textContent = 'Your Drawing';
@@ -999,6 +1028,9 @@ async function startDrawPhase() {
         if (mouseDrawingImage) {
             mouseDrawingImage.classList.remove('hidden');
         }
+        if (faceDrawingImage) {
+            faceDrawingImage.classList.add('hidden');
+        }
     } else if (paintingNumber === 2) {
         phaseLabel.textContent = '';
         if (yourDrawingTitle) {
@@ -1007,6 +1039,9 @@ async function startDrawPhase() {
         stopNoseMode();
         if (mouseDrawingImage) {
             mouseDrawingImage.classList.add('hidden');
+        }
+        if (faceDrawingImage) {
+            faceDrawingImage.classList.add('hidden');
         }
         canvas.style.pointerEvents = 'none';
         setInputEnabled(true);
@@ -1020,9 +1055,31 @@ async function startDrawPhase() {
         if (mouseDrawingImage) {
             mouseDrawingImage.classList.add('hidden');
         }
+        if (faceDrawingImage) {
+            faceDrawingImage.classList.remove('hidden');
+        }
         canvas.style.pointerEvents = 'none';
         setInputEnabled(true);
         await startNoseMode();
+    } else if (paintingNumber === 4) {
+        phaseLabel.textContent = '';
+        if (yourDrawingTitle) {
+            yourDrawingTitle.textContent = 'Draw with your eyes';
+        }
+        stopNoseMode();
+        stopHandMode();
+        if (mouseDrawingImage) {
+            mouseDrawingImage.classList.add('hidden');
+        }
+        if (faceDrawingImage) {
+            faceDrawingImage.classList.add('hidden');
+        }
+        if (eyeDrawingImage) {
+            eyeDrawingImage.classList.remove('hidden');
+        }
+        canvas.style.pointerEvents = 'none';
+        setInputEnabled(true);
+        await startEyeMode();
     } else {
         phaseLabel.textContent = '';
         if (yourDrawingTitle) {
@@ -1030,6 +1087,16 @@ async function startDrawPhase() {
         }
         stopNoseMode();
         stopHandMode();
+        stopEyeMode();
+        if (mouseDrawingImage) {
+            mouseDrawingImage.classList.add('hidden');
+        }
+        if (faceDrawingImage) {
+            faceDrawingImage.classList.add('hidden');
+        }
+        if (eyeDrawingImage) {
+            eyeDrawingImage.classList.add('hidden');
+        }
         setInputEnabled(true);
         canvas.style.pointerEvents = 'auto';
         canvas.style.cursor = 'crosshair';
@@ -1152,6 +1219,7 @@ function finishGame() {
     setInputEnabled(false);
     stopNoseMode();
     stopHandMode();
+    stopEyeMode();
     toolsBar.classList.add('hidden');
     phaseLabel.textContent = '';
     countdownLabel.textContent = '';
@@ -1280,27 +1348,45 @@ function finishGame() {
             phaseLabel.textContent = 'Results';
             
             if (result && result.grade !== null) {
-                currentPaintingIndex = (currentPaintingIndex + 1) % paintings.length;
-                setTimeout(() => {
-                    phaseLabel.textContent = 'Painting cleared! Next painting...';
+                const paintingData = {
+                    index: currentPaintingIndex,
+                    title: paintings[currentPaintingIndex].title,
+                    grade: result.grade,
+                    canvasData: canvas.toDataURL()
+                };
+                completedPaintings.push(paintingData);
+                allGrades.push(result.grade);
+                
+                const nextIndex = (currentPaintingIndex + 1) % paintings.length;
+                const isGameComplete = nextIndex === 0 && completedPaintings.length === paintings.length;
+                
+                if (isGameComplete) {
                     setTimeout(() => {
-                        if (gradeDisplay) {
-                            gradeDisplay.classList.add('hidden');
-                        }
-                        setResultsBarVisible(false);
-                        phaseLabel.textContent = 'Loading next...';
-                        loadCurrentPainting();
-                        const waitForLoad = setInterval(() => {
-                            if (paintingLoaded) {
-                                clearInterval(waitForLoad);
-                                startGameBtn.disabled = true;
-                                startGameBtn.classList.add('hidden');
-                                enterGameReady();
-                                startTeasingPhase();
+                        showFinalResults();
+                    }, 5000);
+                } else {
+                    currentPaintingIndex = nextIndex;
+                    setTimeout(() => {
+                        phaseLabel.textContent = 'Painting cleared! Next painting...';
+                        setTimeout(() => {
+                            if (gradeDisplay) {
+                                gradeDisplay.classList.add('hidden');
                             }
-                        }, 100);
-                    }, 2000);
-                }, 5000);
+                            setResultsBarVisible(false);
+                            phaseLabel.textContent = 'Loading next...';
+                            loadCurrentPainting();
+                            const waitForLoad = setInterval(() => {
+                                if (paintingLoaded) {
+                                    clearInterval(waitForLoad);
+                                    startGameBtn.disabled = true;
+                                    startGameBtn.classList.add('hidden');
+                                    enterGameReady();
+                                    startTeasingPhase();
+                                }
+                            }, 100);
+                        }, 2000);
+                    }, 5000);
+                }
             } else {
                 startGameBtn.textContent = 'Start Challenge';
                 startGameBtn.disabled = false;
@@ -1308,6 +1394,51 @@ function finishGame() {
             }
         }, 1500);
     }, 2000);
+}
+
+function showFinalResults() {
+    if (!finalResultsModal || !gpaDisplay || !paintingGallery) return;
+    
+    const gpa = calculateGPA();
+    gpaDisplay.innerHTML = `<div class="gpa-value">${gpa}</div><div class="gpa-label">GPA</div>`;
+    
+    paintingGallery.innerHTML = '';
+    completedPaintings.forEach((painting, index) => {
+        const paintingCard = document.createElement('div');
+        paintingCard.className = 'painting-card';
+        paintingCard.innerHTML = `
+            <img src="${painting.canvasData}" alt="${painting.title}" class="painting-thumbnail">
+            <div class="painting-info">
+                <h4>${painting.title}</h4>
+                <div class="painting-grade">Grade: ${painting.grade}</div>
+            </div>
+        `;
+        paintingGallery.appendChild(paintingCard);
+    });
+    
+    comparisonSection.classList.add('hidden');
+    setResultsBarVisible(false);
+    if (gradeDisplay) {
+        gradeDisplay.classList.add('hidden');
+    }
+    finalResultsModal.classList.remove('hidden');
+    gameActive = false;
+}
+
+function resetGame() {
+    completedPaintings = [];
+    allGrades = [];
+    currentPaintingIndex = 0;
+    if (finalResultsModal) {
+        finalResultsModal.classList.add('hidden');
+    }
+    enterIdle();
+}
+
+if (restartGameBtn) {
+    restartGameBtn.addEventListener('click', () => {
+        resetGame();
+    });
 }
 
 startGameBtn.addEventListener('click', async () => {
@@ -1333,21 +1464,30 @@ finishBtn.addEventListener('click', finishGame);
 
 const SMOOTHING_FACTOR = 0.9;
 const MIN_DISTANCE_THRESHOLD = 0.05;
+const HAND_SMOOTHING_FACTOR = 0.7;
+const HAND_MIN_DISTANCE_THRESHOLD = 0.02;
 let faceMesh = null;
 let hands = null;
 let camera = null;
 let handModeActive = false;
+let eyeModeActive = false;
 let lastNoseX = 0;
 let lastNoseY = 0;
 let lastHandX = 0;
 let lastHandY = 0;
+let lastEyeX = 0;
+let lastEyeY = 0;
 let handDrawing = false;
 let noseDrawing = false;
+let eyeDrawing = false;
 let smoothedNoseX = 0;
 let smoothedNoseY = 0;
 let smoothedHandX = 0;
 let smoothedHandY = 0;
+let smoothedEyeX = 0;
+let smoothedEyeY = 0;
 let firstNoseDetection = true;
+let firstEyeDetection = true;
 let firstHandDetection = true;
 let extractedColors = [];
 
@@ -1429,15 +1569,16 @@ function drawNoseDot(noseTip) {
 }
 
 function onFaceMeshResults(results) {
-    if (!noseModeActive || !inputEnabled) return;
+    if ((!noseModeActive && !eyeModeActive) || !inputEnabled) return;
 
     if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
         const landmarks = results.multiFaceLandmarks[0];
         
-        drawNoseDot(landmarks[1]);
-        const noseTip = landmarks[1];
+        if (noseModeActive) {
+            drawNoseDot(landmarks[1]);
+            const noseTip = landmarks[1];
         
-        if (noseTip) {
+            if (noseTip) {
             let noseX = noseTip.x;
             let noseY = noseTip.y;
             
@@ -1529,9 +1670,111 @@ function onFaceMeshResults(results) {
             }
 
             if (noseModeActive) updateCursor(constrainedX, constrainedY);
+            }
+        }
+        
+        if (eyeModeActive) {
+            const leftEyeCenter = landmarks[468];
+            const rightEyeCenter = landmarks[473];
+            
+            if (leftEyeCenter && rightEyeCenter) {
+                const eyeX = (leftEyeCenter.x + rightEyeCenter.x) / 2;
+                const eyeY = (leftEyeCenter.y + rightEyeCenter.y) / 2;
+                
+                let normalizedEyeX = Math.max(0, Math.min(1, eyeX));
+                let normalizedEyeY = Math.max(0, Math.min(1, eyeY));
+                
+                if (firstEyeDetection) {
+                    smoothedEyeX = normalizedEyeX;
+                    smoothedEyeY = normalizedEyeY;
+                    firstEyeDetection = false;
+                } else {
+                    smoothedEyeX = smoothedEyeX + SMOOTHING_FACTOR * (normalizedEyeX - smoothedEyeX);
+                    smoothedEyeY = smoothedEyeY + SMOOTHING_FACTOR * (normalizedEyeY - smoothedEyeY);
+                }
+                
+                const canvasAspect = canvas.width / canvas.height;
+                const videoAspect = video.videoWidth / video.videoHeight;
+                let mappedX = smoothedEyeX;
+                let mappedY = smoothedEyeY;
+                
+                if (canvasAspect > videoAspect) {
+                    const scale = videoAspect / canvasAspect;
+                    const offset = (1 - scale) / 2;
+                    mappedX = (smoothedEyeX - offset) / scale;
+                    mappedY = smoothedEyeY;
+                } else {
+                    const scale = canvasAspect / videoAspect;
+                    const offset = (1 - scale) / 2;
+                    mappedX = smoothedEyeX;
+                    mappedY = (smoothedEyeY - offset) / scale;
+                }
+                
+                mappedX = Math.max(0, Math.min(1, mappedX));
+                mappedY = Math.max(0, Math.min(1, mappedY));
+                
+                const canvasX = mappedX * canvas.width;
+                const canvasY = mappedY * canvas.height;
+                const constrainedX = Math.max(0, Math.min(canvas.width, canvasX));
+                const constrainedY = Math.max(0, Math.min(canvas.height, canvasY));
+                
+                ctx.lineWidth = brushSize;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                
+                if (currentTool === 'eraser') {
+                    ctx.globalCompositeOperation = 'destination-out';
+                    ctx.strokeStyle = 'rgba(0,0,0,1)';
+                } else {
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.strokeStyle = currentColor;
+                    ctx.fillStyle = currentColor;
+                }
+                
+                const distance = Math.sqrt(
+                    Math.pow(constrainedX - lastEyeX, 2) + 
+                    Math.pow(constrainedY - lastEyeY, 2)
+                );
+                
+                if (!eyeDrawing) {
+                    if (lastEyeX === 0 && lastEyeY === 0) {
+                        lastEyeX = constrainedX;
+                        lastEyeY = constrainedY;
+                    } else if (distance > MIN_DISTANCE_THRESHOLD * Math.min(canvas.width, canvas.height)) {
+                        eyeDrawing = true;
+                        startTimer();
+                        ctx.beginPath();
+                        ctx.moveTo(constrainedX, constrainedY);
+                        lastEyeX = constrainedX;
+                        lastEyeY = constrainedY;
+                    }
+                } else {
+                    if (distance > 1) {
+                        ctx.lineTo(constrainedX, constrainedY);
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.moveTo(constrainedX, constrainedY);
+                        
+                        lastEyeX = constrainedX;
+                        lastEyeY = constrainedY;
+                        updateCanvasVisibility();
+                    }
+                }
+                
+                if (currentTool === 'eraser') {
+                    ctx.globalCompositeOperation = 'source-over';
+                }
+                
+                if (eyeModeActive) updateCursor(constrainedX, constrainedY);
+            }
         }
     } else {
-        noseDrawing = false;
+        if (noseModeActive) {
+            noseDrawing = false;
+        }
+        if (eyeModeActive) {
+            eyeDrawing = false;
+        }
         noseCursor.classList.add('hidden');
         if (handWireframeCtx) {
             handWireframeCtx.clearRect(0, 0, handWireframeCanvas.width, handWireframeCanvas.height);
@@ -1662,6 +1905,7 @@ async function startNoseMode() {
 function stopNoseMode() {
     noseModeActive = false;
     noseDrawing = false;
+    if (eyeModeActive) return;
 
     if (camera) {
         camera.stop();
@@ -1684,6 +1928,112 @@ function stopNoseMode() {
     }
     noseCursor.classList.add('hidden');
     canvas.style.pointerEvents = inputEnabled ? 'auto' : 'none';
+}
+
+async function startEyeMode() {
+    if (eyeModeActive || !gameActive) return;
+
+    eyeModeActive = true;
+
+    try {
+        if (typeof Camera === 'undefined') {
+            alert('MediaPipe libraries are loading. Please wait a moment and try again.');
+            eyeModeActive = false;
+            return;
+        }
+
+        if (!faceMesh) {
+            initializeFaceMesh();
+        }
+
+        const { camWidth, camHeight } = calculateCameraSize();
+        await showWebcamModal();
+        
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                facingMode: 'user',
+                width: { ideal: camWidth },
+                height: { ideal: camHeight }
+            } 
+        });
+
+        video.srcObject = stream;
+        await video.play();
+        video.classList.remove('hidden');
+        
+        if (handWireframeCanvas) {
+            handWireframeCanvas.classList.remove('hidden');
+            handWireframeCanvas.width = 200;
+            handWireframeCanvas.height = 150;
+        }
+
+        setTimeout(() => {
+            updateVideoSize();
+        }, 100);
+
+        let lastFaceSend = 0;
+        const FACE_SEND_THROTTLE = 33;
+        
+        camera = new Camera(video, {
+            onFrame: async () => {
+                if (eyeModeActive && faceMesh) {
+                    const now = Date.now();
+                    if (now - lastFaceSend >= FACE_SEND_THROTTLE) {
+                        lastFaceSend = now;
+                        try {
+                            await faceMesh.send({ image: video });
+                        } catch (error) {
+                            console.error('Error sending to face mesh:', error);
+                        }
+                    }
+                }
+            },
+            width: camWidth,
+            height: camHeight
+        });
+
+        camera.start();
+        canvas.style.pointerEvents = 'none';
+
+        eyeDrawing = false;
+        smoothedEyeX = 0;
+        smoothedEyeY = 0;
+        lastEyeX = 0;
+        lastEyeY = 0;
+        firstEyeDetection = true;
+    } catch (err) {
+        eyeModeActive = false;
+        console.error('Error accessing camera:', err);
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+            alert('Camera access denied. Please allow camera permissions in your browser settings and try again.');
+        } else {
+            alert('Could not access camera: ' + err.message);
+        }
+    }
+}
+
+function stopEyeMode() {
+    eyeModeActive = false;
+    eyeDrawing = false;
+    if (noseModeActive) return;
+
+    if (camera) {
+        camera.stop();
+        camera = null;
+    }
+
+    if (video.srcObject) {
+        const stream = video.srcObject;
+        const tracks = stream.getTracks();
+        tracks.forEach(track => track.stop());
+        video.srcObject = null;
+    }
+
+    video.classList.add('hidden');
+    if (handWireframeCanvas) {
+        handWireframeCanvas.classList.add('hidden');
+    }
+    noseCursor.classList.add('hidden');
 }
 
 function initializeHands() {
@@ -1717,8 +2067,8 @@ function onHandResults(results) {
         drawHandWireframe(landmarks);
         
         if (indexFinger) {
-            let handX = indexFinger.x;
-            let handY = 1 - indexFinger.y;
+            let handX = 1 - indexFinger.x;
+            let handY = indexFinger.y;
             
             handX = Math.max(0, Math.min(1, handX));
             handY = Math.max(0, Math.min(1, handY));
@@ -1728,8 +2078,8 @@ function onHandResults(results) {
                 smoothedHandY = handY;
                 firstHandDetection = false;
             } else {
-                smoothedHandX = smoothedHandX + SMOOTHING_FACTOR * (handX - smoothedHandX);
-                smoothedHandY = smoothedHandY + SMOOTHING_FACTOR * (handY - smoothedHandY);
+                smoothedHandX = smoothedHandX + HAND_SMOOTHING_FACTOR * (handX - smoothedHandX);
+                smoothedHandY = smoothedHandY + HAND_SMOOTHING_FACTOR * (handY - smoothedHandY);
             }
             
             const canvasX = smoothedHandX * canvas.width;
@@ -1761,7 +2111,7 @@ function onHandResults(results) {
                 if (lastHandX === 0 && lastHandY === 0) {
                     lastHandX = constrainedX;
                     lastHandY = constrainedY;
-                } else if (distance > MIN_DISTANCE_THRESHOLD * Math.min(canvas.width, canvas.height)) {
+                } else if (distance > HAND_MIN_DISTANCE_THRESHOLD * Math.min(canvas.width, canvas.height)) {
                     handDrawing = true;
                     startTimer();
                     ctx.beginPath();
@@ -1770,7 +2120,7 @@ function onHandResults(results) {
                     lastHandY = constrainedY;
                 }
             } else {
-                if (distance > 1) {
+                if (distance > 0.5) {
                     ctx.lineTo(constrainedX, constrainedY);
                     ctx.stroke();
                     ctx.beginPath();
@@ -1884,7 +2234,7 @@ function stopHandMode() {
     handModeActive = false;
     handDrawing = false;
     
-    if (camera && !noseModeActive) {
+    if (camera && !noseModeActive && !eyeModeActive) {
         camera.stop();
         camera = null;
         
@@ -1915,6 +2265,7 @@ setInputEnabled = function(enabled) {
     if (!enabled && !gameActive) {
         if (noseModeActive) stopNoseMode();
         if (handModeActive) stopHandMode();
+        if (eyeModeActive) stopEyeMode();
     }
 };
 

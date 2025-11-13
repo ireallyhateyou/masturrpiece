@@ -94,6 +94,8 @@
             <div class="canvas-wrapper">
                 <div class="drawing-indicator">
                     <img src="images/mouse.png" alt="Mouse" class="drawing-icon hidden" id="mouseDrawingImage">
+                    <img src="images/facetrack.png" alt="Face Tracking" class="drawing-icon hidden" id="faceDrawingImage">
+                    <img src="images/facetrack.png" alt="Eye Tracking" class="drawing-icon hidden" id="eyeDrawingImage">
                 </div>
                 <h3 id="yourDrawingTitle">Your Drawing</h3>
                 <div class="canvas-container">
@@ -127,6 +129,16 @@
 
         <div class="toolbar" id="resultsBar" style="margin-top: 20px;">
             <div id="comparisonResult" class="comparison-result"></div>
+        </div>
+    </div>
+
+    <div id="finalResultsModal" class="final-results-modal hidden">
+        <div class="final-results-content">
+            <h2>🎨 Your Painter GPA</h2>
+            <div id="gpaDisplay" class="gpa-display"></div>
+            <h3>Your Gallery</h3>
+            <div id="paintingGallery" class="painting-gallery"></div>
+            <button id="restartGameBtn" class="btn">Play Again</button>
         </div>
     </div>
 

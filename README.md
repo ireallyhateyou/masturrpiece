@@ -1,5 +1,6 @@
 # masturrpiece
-create fine art
+My first actual game (with a story and all), figure out what your painting GPA is! I struggled a lot with the tracking tbh, felt like I was running around in circles.
+
 
 <div align="center">
   <a href="https://moonshot.hackclub.com" target="_blank">
