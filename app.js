@@ -410,9 +410,9 @@ const restartGameBtn = document.getElementById('restartGameBtn');
 
 const paintings = [
     { title: 'Mona Lisa', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg/500px-Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg' },
-    { title: 'The Starry Night', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/01/Vincent_van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg/960px-Vincent_van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg' },
+    { title: 'Girl with a Pearl Earring', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Meisje_met_de_parel.jpg/960px-Meisje_met_de_parel.jpg' },
     { title: 'The Scream', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f4/The_Scream.jpg/500px-The_Scream.jpg' },
-    { title: 'Girl with a Pearl Earring', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Meisje_met_de_parel.jpg/960px-Meisje_met_de_parel.jpg' }
+    { title: 'Black Square', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Kazimir_Malevich%2C_1915%2C_Black_Suprematic_Square%2C_oil_on_linen_canvas%2C_79.5_x_79.5_cm%2C_Tretyakov_Gallery%2C_Moscow.jpg/800px-Kazimir_Malevich%2C_1915%2C_Black_Suprematic_Square%2C_oil_on_linen_canvas%2C_79.5_x_79.5_cm%2C_Tretyakov_Gallery%2C_Moscow.jpg' }
 ];
 
 let currentPaintingIndex = 0;
@@ -835,8 +835,8 @@ function startTeasingPhase() {
         ];
     } else if (paintingNumber === 2) {
         teasingLines = [
-            'I was painted in a single night...',
-            'I swirl with emotions and dreams...',
+            'I am known as the Dutch Mona Lisa...',
+            'My identity remains a mystery...',
             'I am...'
         ];
     } else if (paintingNumber === 3) {
@@ -847,8 +847,8 @@ function startTeasingPhase() {
         ];
     } else if (paintingNumber === 4) {
         teasingLines = [
-            'I am known as the Dutch Mona Lisa...',
-            'My identity remains a mystery...',
+            'I am abstract...',
+            'I am the zero point of painting...',
             'I am...'
         ];
     }
@@ -954,14 +954,14 @@ function showPaintingFacts() {
             <p><strong>Value:</strong> Estimated at over 8 billion stardust</p>
         `;
     } else if (paintingNumber === 2) {
-        title = 'The Starry Night';
+        title = 'Girl with a Pearl Earring';
         factsHTML = `
-            <p><strong>Artist:</strong> Vincent van Gogh</p>
-            <p><strong>Year:</strong> 1889</p>
-            <p><strong>Location:</strong> Museum of Modern Art, New York</p>
-            <p><strong>Famous for:</strong> The pretty sky</p>
-            <p><strong>Fun fact:</strong> Painted from memory when van Gogh was in an asylum in France</p>
-            <p><strong>Value:</strong> Estimated at over 1 billion stardust</p>
+            <p><strong>Artist:</strong> Johannes Vermeer</p>
+            <p><strong>Year:</strong> 1665</p>
+            <p><strong>Location:</strong> Mauritshuis, The Hague</p>
+            <p><strong>Famous for:</strong> Being called "the Dutch Mona Lisa"</p>
+            <p><strong>Fun fact:</strong> The subject's identity is unknown, and the "pearl" is likely a glass bead</p>
+            <p><strong>Value:</strong> Priceless - considered a national treasure of the Netherlands</p>
         `;
     } else if (paintingNumber === 3) {
         title = 'The Scream';
@@ -974,14 +974,14 @@ function showPaintingFacts() {
             <p><strong>Value:</strong> Sold for 1 billion stardust (in dollars) in 2012 (one of four versions)</p>
         `;
     } else if (paintingNumber === 4) {
-        title = 'Girl with a Pearl Earring';
+        title = 'Black Square';
         factsHTML = `
-            <p><strong>Artist:</strong> Johannes Vermeer</p>
-            <p><strong>Year:</strong> 1665</p>
-            <p><strong>Location:</strong> Mauritshuis, The Hague</p>
-            <p><strong>Famous for:</strong> Being called "the Dutch Mona Lisa"</p>
-            <p><strong>Fun fact:</strong> The subject's identity is unknown, and the "pearl" is likely a glass bead</p>
-            <p><strong>Value:</strong> Priceless - considered a national treasure of the Netherlands</p>
+            <p><strong>Artist:</strong> Kazimir Malevich</p>
+            <p><strong>Year:</strong> 1915</p>
+            <p><strong>Location:</strong> Tretyakov Gallery, Moscow</p>
+            <p><strong>Famous for:</strong> Being literally just a black square - the ultimate simplicity</p>
+            <p><strong>Fun fact:</strong> Considered the "zero point of painting" - the most radical simplification possible</p>
+            <p><strong>Value:</strong> Priceless - a foundational work of abstract art!</p>
         `;
     }
     
@@ -1354,9 +1354,9 @@ function finishGame() {
                     grade: result.grade,
                     canvasData: canvas.toDataURL()
                 };
+                
                 completedPaintings.push(paintingData);
                 allGrades.push(result.grade);
-                
                 const nextIndex = (currentPaintingIndex + 1) % paintings.length;
                 const isGameComplete = nextIndex === 0 && completedPaintings.length === paintings.length;
                 
@@ -1365,6 +1365,7 @@ function finishGame() {
                         showFinalResults();
                     }, 5000);
                 } else {
+                    const completedPaintingIndex = currentPaintingIndex;
                     currentPaintingIndex = nextIndex;
                     setTimeout(() => {
                         phaseLabel.textContent = 'Painting cleared! Next painting...';
@@ -1378,10 +1379,22 @@ function finishGame() {
                             const waitForLoad = setInterval(() => {
                                 if (paintingLoaded) {
                                     clearInterval(waitForLoad);
-                                    startGameBtn.disabled = true;
-                                    startGameBtn.classList.add('hidden');
-                                    enterGameReady();
-                                    startTeasingPhase();
+                                    const continueToNext = () => {
+                                        startGameBtn.disabled = true;
+                                        startGameBtn.classList.add('hidden');
+                                        enterGameReady();
+                                        startTeasingPhase();
+                                    };
+                                    
+                                    if (completedPaintingIndex === 0) {
+                                        showHandStory(continueToNext);
+                                    } else if (completedPaintingIndex === 1) {
+                                        showNoseStory(continueToNext);
+                                    } else if (completedPaintingIndex === 2) {
+                                        showEyesStory(continueToNext);
+                                    } else {
+                                        continueToNext();
+                                    }
                                 }
                             }, 100);
                         }, 2000);
@@ -2057,6 +2070,25 @@ function initializeHands() {
     hands.onResults(onHandResults);
 }
 
+function isFist(landmarks) {
+    if (!landmarks || landmarks.length < 21) return false;
+    
+    // Check if all fingertips are below their PIP joints (fingers curled)
+    // Thumb: tip (4) below IP (3)
+    // Index: tip (8) below PIP (6)
+    // Middle: tip (12) below PIP (10)
+    // Ring: tip (16) below PIP (14)
+    // Pinky: tip (20) below PIP (18)
+    
+    const thumbClosed = landmarks[4].y > landmarks[3].y;
+    const indexClosed = landmarks[8].y > landmarks[6].y;
+    const middleClosed = landmarks[12].y > landmarks[10].y;
+    const ringClosed = landmarks[16].y > landmarks[14].y;
+    const pinkyClosed = landmarks[20].y > landmarks[18].y;
+    
+    return thumbClosed && indexClosed && middleClosed && ringClosed && pinkyClosed;
+}
+
 function onHandResults(results) {
     if (!handModeActive || !inputEnabled) return;
 
@@ -2065,6 +2097,12 @@ function onHandResults(results) {
         const indexFinger = landmarks[8];
         
         drawHandWireframe(landmarks);
+        
+        // Check if hand is making a fist
+        if (isFist(landmarks)) {
+            handDrawing = false;
+            return;
+        }
         
         if (indexFinger) {
             let handX = 1 - indexFinger.x;
@@ -2283,6 +2321,21 @@ const dialogueScript = [
     { title: '', text: 'Begin your quest, brave artist!', image: 'images/museum6.png' }
 ];
 
+const handStoryScript = [
+    { title: '', text: 'oh no! the mighty snek ate your mouse!', image: 'images/hand1.png' },
+    { title: '', text: 'I guess you are forced to use your hand now, track your index finger to move the cursor.', image: 'images/hand2.png' }
+];
+
+const noseStoryScript = [
+    { title: '', text: 'the snek bit your arm!!!!', image: 'images/nose1.png' },
+    { title: '', text: 'while the antivenom is being administered, you will draw with your face.', image: 'images/facetrack.png' }
+];
+
+const eyesStoryScript = [
+    { title: '', text: 'got your nose!', image: 'images/eyes1.png' },
+    { title: '', text: 'you will now use your eyes.', image: 'images/eyes2.png' }
+];
+
 let currentDialogueIndex = 0;
 let isTyping = false;
 let typewriterSpeed = 30;
@@ -2392,6 +2445,36 @@ function showDialogue(index) {
 }
 
 storyNextBtn.addEventListener('click', () => {
+    if (handStoryCallback !== null) {
+        if (isTyping) {
+            skipTyping();
+            return;
+        }
+        handStoryIndex++;
+        showHandStoryDialogue(handStoryIndex);
+        return;
+    }
+    
+    if (noseStoryCallback !== null) {
+        if (isTyping) {
+            skipTyping();
+            return;
+        }
+        noseStoryIndex++;
+        showNoseStoryDialogue(noseStoryIndex);
+        return;
+    }
+    
+    if (eyesStoryCallback !== null) {
+        if (isTyping) {
+            skipTyping();
+            return;
+        }
+        eyesStoryIndex++;
+        showEyesStoryDialogue(eyesStoryIndex);
+        return;
+    }
+    
     if (isTyping) {
         skipTyping();
         return;
@@ -2403,6 +2486,36 @@ storyNextBtn.addEventListener('click', () => {
 
 storyModal.addEventListener('click', (e) => {
     if (e.target === storyModal || e.target === storyModal.querySelector('.story-content')) {
+        if (handStoryCallback !== null) {
+            if (isTyping) {
+                skipTyping();
+            } else if (!storyNextBtn.classList.contains('hidden')) {
+                handStoryIndex++;
+                showHandStoryDialogue(handStoryIndex);
+            }
+            return;
+        }
+        
+        if (noseStoryCallback !== null) {
+            if (isTyping) {
+                skipTyping();
+            } else if (!storyNextBtn.classList.contains('hidden')) {
+                noseStoryIndex++;
+                showNoseStoryDialogue(noseStoryIndex);
+            }
+            return;
+        }
+        
+        if (eyesStoryCallback !== null) {
+            if (isTyping) {
+                skipTyping();
+            } else if (!storyNextBtn.classList.contains('hidden')) {
+                eyesStoryIndex++;
+                showEyesStoryDialogue(eyesStoryIndex);
+            }
+            return;
+        }
+        
         if (isTyping) {
             skipTyping();
         } else if (!storyNextBtn.classList.contains('hidden')) {
@@ -2411,6 +2524,188 @@ storyModal.addEventListener('click', (e) => {
         }
     }
 });
+
+let handStoryIndex = 0;
+let handStoryCallback = null;
+let noseStoryIndex = 0;
+let noseStoryCallback = null;
+let eyesStoryIndex = 0;
+let eyesStoryCallback = null;
+
+function showHandStory(callback) {
+    handStoryCallback = callback;
+    handStoryIndex = 0;
+    storyModal.classList.remove('hidden');
+    container.classList.remove('visible');
+    showHandStoryDialogue(0);
+}
+
+function showNoseStory(callback) {
+    noseStoryCallback = callback;
+    noseStoryIndex = 0;
+    storyModal.classList.remove('hidden');
+    container.classList.remove('visible');
+    showNoseStoryDialogue(0);
+}
+
+function showEyesStory(callback) {
+    eyesStoryCallback = callback;
+    eyesStoryIndex = 0;
+    storyModal.classList.remove('hidden');
+    container.classList.remove('visible');
+    showEyesStoryDialogue(0);
+}
+
+function showHandStoryDialogue(index) {
+    if (index >= handStoryScript.length) {
+        storyModal.classList.add('hidden');
+        container.classList.add('visible');
+        const callback = handStoryCallback;
+        handStoryCallback = null;
+        if (callback) {
+            callback();
+        }
+        return;
+    }
+    
+    const dialogue = handStoryScript[index];
+    isTyping = true;
+    
+    if (dialogue.image) {
+        storyImage.src = dialogue.image;
+        storyImage.classList.remove('hidden');
+    } else {
+        storyImage.classList.add('hidden');
+    }
+    
+    if (dialogue.title) {
+        storyTitle.style.display = '';
+        typeWriter(storyTitle, dialogue.title, () => {
+            if (dialogue.html) {
+                storyParagraph.innerHTML = dialogue.html;
+                storyParagraph.classList.add('complete');
+                if (activeTypewriters.length === 0) {
+                    isTyping = false;
+                    storyNextBtn.classList.remove('hidden');
+                }
+            } else {
+                typeWriter(storyParagraph, dialogue.text, null);
+            }
+        });
+    } else {
+        storyTitle.textContent = '';
+        storyTitle.style.display = 'none';
+        if (dialogue.html) {
+            storyParagraph.innerHTML = dialogue.html;
+            storyParagraph.classList.add('complete');
+            isTyping = false;
+            storyNextBtn.classList.remove('hidden');
+        } else {
+            typeWriter(storyParagraph, dialogue.text, null);
+        }
+    }
+}
+
+function showNoseStoryDialogue(index) {
+    if (index >= noseStoryScript.length) {
+        storyModal.classList.add('hidden');
+        container.classList.add('visible');
+        const callback = noseStoryCallback;
+        noseStoryCallback = null;
+        if (callback) {
+            callback();
+        }
+        return;
+    }
+    
+    const dialogue = noseStoryScript[index];
+    isTyping = true;
+    
+    if (dialogue.image) {
+        storyImage.src = dialogue.image;
+        storyImage.classList.remove('hidden');
+    } else {
+        storyImage.classList.add('hidden');
+    }
+    
+    if (dialogue.title) {
+        storyTitle.style.display = '';
+        typeWriter(storyTitle, dialogue.title, () => {
+            if (dialogue.html) {
+                storyParagraph.innerHTML = dialogue.html;
+                storyParagraph.classList.add('complete');
+                if (activeTypewriters.length === 0) {
+                    isTyping = false;
+                    storyNextBtn.classList.remove('hidden');
+                }
+            } else {
+                typeWriter(storyParagraph, dialogue.text, null);
+            }
+        });
+    } else {
+        storyTitle.textContent = '';
+        storyTitle.style.display = 'none';
+        if (dialogue.html) {
+            storyParagraph.innerHTML = dialogue.html;
+            storyParagraph.classList.add('complete');
+            isTyping = false;
+            storyNextBtn.classList.remove('hidden');
+        } else {
+            typeWriter(storyParagraph, dialogue.text, null);
+        }
+    }
+}
+
+function showEyesStoryDialogue(index) {
+    if (index >= eyesStoryScript.length) {
+        storyModal.classList.add('hidden');
+        container.classList.add('visible');
+        const callback = eyesStoryCallback;
+        eyesStoryCallback = null;
+        if (callback) {
+            callback();
+        }
+        return;
+    }
+    
+    const dialogue = eyesStoryScript[index];
+    isTyping = true;
+    
+    if (dialogue.image) {
+        storyImage.src = dialogue.image;
+        storyImage.classList.remove('hidden');
+    } else {
+        storyImage.classList.add('hidden');
+    }
+    
+    if (dialogue.title) {
+        storyTitle.style.display = '';
+        typeWriter(storyTitle, dialogue.title, () => {
+            if (dialogue.html) {
+                storyParagraph.innerHTML = dialogue.html;
+                storyParagraph.classList.add('complete');
+                if (activeTypewriters.length === 0) {
+                    isTyping = false;
+                    storyNextBtn.classList.remove('hidden');
+                }
+            } else {
+                typeWriter(storyParagraph, dialogue.text, null);
+            }
+        });
+    } else {
+        storyTitle.textContent = '';
+        storyTitle.style.display = 'none';
+        if (dialogue.html) {
+            storyParagraph.innerHTML = dialogue.html;
+            storyParagraph.classList.add('complete');
+            isTyping = false;
+            storyNextBtn.classList.remove('hidden');
+        } else {
+            typeWriter(storyParagraph, dialogue.text, null);
+        }
+    }
+}
+
 
 function checkHardwareAcceleration() {
     try {
