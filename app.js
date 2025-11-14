@@ -1039,7 +1039,10 @@ async function startDrawPhase() {
             mouseDrawingImage.classList.add('hidden');
         }
         if (faceDrawingImage) {
-            faceDrawingImage.classList.add('hidden');
+            faceDrawingImage.classList.remove('hidden');
+        }
+        if (eyeDrawingImage) {
+            eyeDrawingImage.classList.add('hidden');
         }
         canvas.style.pointerEvents = 'none';
         setInputEnabled(true);
@@ -1055,6 +1058,9 @@ async function startDrawPhase() {
         }
         if (faceDrawingImage) {
             faceDrawingImage.classList.remove('hidden');
+        }
+        if (eyeDrawingImage) {
+            eyeDrawingImage.classList.add('hidden');
         }
         canvas.style.pointerEvents = 'none';
         setInputEnabled(true);
@@ -1488,6 +1494,8 @@ const SMOOTHING_FACTOR = 0.9;
 const MIN_DISTANCE_THRESHOLD = 0.05;
 const HAND_SMOOTHING_FACTOR = 0.7;
 const HAND_MIN_DISTANCE_THRESHOLD = 0.02;
+const EYE_SMOOTHING_FACTOR = 0.8;
+const EYE_MIN_DISTANCE_THRESHOLD = 0.03;
 let faceMesh = null;
 let hands = null;
 let camera = null;
@@ -1584,6 +1592,24 @@ function drawNoseDot(noseTip) {
         noseTip.x * handWireframeCanvas.width,
         noseTip.y * handWireframeCanvas.height,
         8,
+        0,
+        2 * Math.PI
+    );
+    handWireframeCtx.fill();
+}
+
+function drawEyeDot(eyeX, eyeY) {
+    if (!handWireframeCtx || handWireframeCanvas.classList.contains('hidden')) return;
+    
+    if (!noseModeActive) {
+        handWireframeCtx.clearRect(0, 0, handWireframeCanvas.width, handWireframeCanvas.height);
+    }
+    handWireframeCtx.fillStyle = '#00ff00';
+    handWireframeCtx.beginPath();
+    handWireframeCtx.arc(
+        eyeX * handWireframeCanvas.width,
+        eyeY * handWireframeCanvas.height,
+        6,
         0,
         2 * Math.PI
     );
@@ -1710,12 +1736,38 @@ function onFaceMeshResults(results) {
         }
         
         if (eyeModeActive) {
-            const leftEyeCenter = landmarks[468];
-            const rightEyeCenter = landmarks[473];
+            // Use multiple landmarks for more stable eye center detection
+            // Left eye: landmarks 33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246
+            // Right eye: landmarks 362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398
+            // Use iris centers: 468 (left) and 473 (right) as primary, fallback to eye corners
             
-            if (leftEyeCenter && rightEyeCenter) {
-                const eyeX = (leftEyeCenter.x + rightEyeCenter.x) / 2;
-                const eyeY = (leftEyeCenter.y + rightEyeCenter.y) / 2;
+            const leftIris = landmarks[468];
+            const rightIris = landmarks[473];
+            const leftEyeOuter = landmarks[33];
+            const leftEyeInner = landmarks[133];
+            const rightEyeOuter = landmarks[263];
+            const rightEyeInner = landmarks[362];
+            
+            let eyeX, eyeY;
+            
+            if (leftIris && rightIris) {
+                // Use iris centers if available
+                eyeX = (leftIris.x + rightIris.x) / 2;
+                eyeY = (leftIris.y + rightIris.y) / 2;
+            } else if (leftEyeOuter && leftEyeInner && rightEyeOuter && rightEyeInner) {
+                // Fallback to eye corners
+                const leftEyeCenterX = (leftEyeOuter.x + leftEyeInner.x) / 2;
+                const leftEyeCenterY = (leftEyeOuter.y + leftEyeInner.y) / 2;
+                const rightEyeCenterX = (rightEyeOuter.x + rightEyeInner.x) / 2;
+                const rightEyeCenterY = (rightEyeOuter.y + rightEyeInner.y) / 2;
+                eyeX = (leftEyeCenterX + rightEyeCenterX) / 2;
+                eyeY = (leftEyeCenterY + rightEyeCenterY) / 2;
+            } else {
+                return; // No valid eye landmarks detected
+            }
+            
+            if (eyeX !== undefined && eyeY !== undefined) {
+                drawEyeDot(eyeX, eyeY);
                 
                 let normalizedEyeX = Math.max(0, Math.min(1, eyeX));
                 let normalizedEyeY = Math.max(0, Math.min(1, eyeY));
@@ -1728,8 +1780,8 @@ function onFaceMeshResults(results) {
                         detectionWaitOverlay.classList.add('hidden');
                     }
                 } else {
-                    smoothedEyeX = smoothedEyeX + SMOOTHING_FACTOR * (normalizedEyeX - smoothedEyeX);
-                    smoothedEyeY = smoothedEyeY + SMOOTHING_FACTOR * (normalizedEyeY - smoothedEyeY);
+                    smoothedEyeX = smoothedEyeX + EYE_SMOOTHING_FACTOR * (normalizedEyeX - smoothedEyeX);
+                    smoothedEyeY = smoothedEyeY + EYE_SMOOTHING_FACTOR * (normalizedEyeY - smoothedEyeY);
                 }
                 
                 const canvasAspect = canvas.width / canvas.height;
@@ -1779,7 +1831,7 @@ function onFaceMeshResults(results) {
                     if (lastEyeX === 0 && lastEyeY === 0) {
                         lastEyeX = constrainedX;
                         lastEyeY = constrainedY;
-                    } else if (distance > MIN_DISTANCE_THRESHOLD * Math.min(canvas.width, canvas.height)) {
+                    } else if (distance > EYE_MIN_DISTANCE_THRESHOLD * Math.min(canvas.width, canvas.height)) {
                         eyeDrawing = true;
                         startTimer();
                         ctx.beginPath();
@@ -1788,7 +1840,7 @@ function onFaceMeshResults(results) {
                         lastEyeY = constrainedY;
                     }
                 } else {
-                    if (distance > 1) {
+                    if (distance > 0.5) {
                         ctx.lineTo(constrainedX, constrainedY);
                         ctx.stroke();
                         ctx.beginPath();
