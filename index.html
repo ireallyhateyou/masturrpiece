@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>masturrpiece</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎨</text></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23333'/><rect x='20' y='20' width='60' height='60' fill='none' stroke='white' stroke-width='4'/></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Luxurious+Script&display=swap" rel="stylesheet">
@@ -111,6 +111,9 @@
                     <video id="video" autoplay playsinline class="hidden"></video>
                     <canvas id="handWireframeCanvas" class="hidden"></canvas>
                     <div id="noseCursor" class="nose-cursor hidden"></div>
+                    <div id="detectionWaitOverlay" class="detection-wait-overlay hidden">
+                        <div class="detection-wait-text">Please wait...</div>
+                    </div>
                 </div>
             </div>
             <div class="grade-wrapper hidden" id="gradeWrapper">
@@ -135,7 +138,7 @@
 
     <div id="finalResultsModal" class="final-results-modal hidden">
         <div class="final-results-content">
-            <h2>🎨 Your Painter GPA</h2>
+            <h2>Your Painter GPA</h2>
             <div id="gpaDisplay" class="gpa-display"></div>
             <h3>Your Gallery</h3>
             <div id="paintingGallery" class="painting-gallery"></div>

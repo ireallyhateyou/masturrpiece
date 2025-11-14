@@ -404,6 +404,7 @@ const transitionOverlay = document.getElementById('transitionOverlay');
 const referenceCanvas = document.getElementById('referenceCanvas');
 const gradeDisplay = document.getElementById('gradeDisplay');
 const gradeWrapper = document.getElementById('gradeWrapper');
+const detectionWaitOverlay = document.getElementById('detectionWaitOverlay');
 const finalResultsModal = document.getElementById('finalResultsModal');
 const gpaDisplay = document.getElementById('gpaDisplay');
 const paintingGallery = document.getElementById('paintingGallery');
@@ -412,7 +413,7 @@ const restartGameBtn = document.getElementById('restartGameBtn');
 const paintings = [
     { title: 'Mona Lisa', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg/500px-Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg' },
     { title: 'Girl with a Pearl Earring', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Meisje_met_de_parel.jpg/960px-Meisje_met_de_parel.jpg' },
-    { title: 'The Scream', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f4/The_Scream.jpg/500px-The_Scream.jpg' },
+    { title: 'Broadway Boogie Woogie', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Piet_Mondrian%2C_1942_-_Broadway_Boogie_Woogie.jpg/960px-Piet_Mondrian%2C_1942_-_Broadway_Boogie_Woogie.jpg' },
     { title: 'Black Square', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/dc/Kazimir_Malevich%2C_1915%2C_Black_Suprematic_Square%2C_oil_on_linen_canvas%2C_79.5_x_79.5_cm%2C_Tretyakov_Gallery%2C_Moscow.jpg/960px-Kazimir_Malevich%2C_1915%2C_Black_Suprematic_Square%2C_oil_on_linen_canvas%2C_79.5_x_79.5_cm%2C_Tretyakov_Gallery%2C_Moscow.jpg' }
 ];
 
@@ -838,8 +839,8 @@ function startTeasingPhase() {
         ];
     } else if (paintingNumber === 3) {
         teasingLines = [
-            'I capture a moment of pure emotion...',
-            'I have been stolen multiple times...',
+            'I capture the rhythm of the city...',
+            'I am geometric perfection...',
             'I am...'
         ];
     } else if (paintingNumber === 4) {
@@ -961,14 +962,14 @@ function showPaintingFacts() {
             <p><strong>Value:</strong> Priceless - considered a national treasure of the Netherlands</p>
         `;
     } else if (paintingNumber === 3) {
-        title = 'The Scream';
+        title = 'Broadway Boogie Woogie';
         factsHTML = `
-            <p><strong>Artist:</strong> Edvard Munch</p>
-            <p><strong>Year:</strong> 1893</p>
-            <p><strong>Location:</strong> National Gallery, Oslo</p>
-            <p><strong>Famous for:</strong> the dude screaming his head off</p>
-            <p><strong>Fun fact:</strong> Stolen twice (1994 and 2004) and recovered both times</p>
-            <p><strong>Value:</strong> Sold for 1 billion stardust (in dollars) in 2012 (one of four versions)</p>
+            <p><strong>Artist:</strong> Piet Mondrian</p>
+            <p><strong>Year:</strong> 1942-1943</p>
+            <p><strong>Location:</strong> Museum of Modern Art, New York</p>
+            <p><strong>Famous for:</strong> Capturing the rhythm and energy of New York City</p>
+            <p><strong>Fun fact:</strong> Mondrian's last completed painting before his death - inspired by jazz and city life</p>
+            <p><strong>Value:</strong> Estimated at over 50 million stardust - geometric perfection!</p>
         `;
     } else if (paintingNumber === 4) {
         title = 'Black Square';
@@ -1423,8 +1424,12 @@ function showFinalResults() {
     completedPaintings.forEach((painting, index) => {
         const paintingCard = document.createElement('div');
         paintingCard.className = 'painting-card';
+        const originalSrc = paintings[painting.index].src;
         paintingCard.innerHTML = `
-            <img src="${painting.canvasData}" alt="${painting.title}" class="painting-thumbnail">
+            <div class="painting-thumbnail-container">
+                <img src="${painting.canvasData}" alt="${painting.title}" class="painting-thumbnail">
+                <img src="${originalSrc}" alt="${painting.title} (Original)" class="painting-original">
+            </div>
             <div class="painting-info">
                 <h4>${painting.title}</h4>
                 <div class="painting-grade">Grade: ${painting.grade}</div>
@@ -1617,6 +1622,9 @@ function onFaceMeshResults(results) {
                 smoothedNoseX = noseX;
                 smoothedNoseY = noseY;
                 firstNoseDetection = false;
+                if (detectionWaitOverlay) {
+                    detectionWaitOverlay.classList.add('hidden');
+                }
             } else {
                 smoothedNoseX = smoothedNoseX + SMOOTHING_FACTOR * (noseX - smoothedNoseX);
                 smoothedNoseY = smoothedNoseY + SMOOTHING_FACTOR * (noseY - smoothedNoseY);
@@ -1716,6 +1724,9 @@ function onFaceMeshResults(results) {
                     smoothedEyeX = normalizedEyeX;
                     smoothedEyeY = normalizedEyeY;
                     firstEyeDetection = false;
+                    if (detectionWaitOverlay) {
+                        detectionWaitOverlay.classList.add('hidden');
+                    }
                 } else {
                     smoothedEyeX = smoothedEyeX + SMOOTHING_FACTOR * (normalizedEyeX - smoothedEyeX);
                     smoothedEyeY = smoothedEyeY + SMOOTHING_FACTOR * (normalizedEyeY - smoothedEyeY);
@@ -1940,6 +1951,9 @@ async function startNoseMode() {
         lastNoseX = 0;
         lastNoseY = 0;
         firstNoseDetection = true;
+        if (detectionWaitOverlay) {
+            detectionWaitOverlay.classList.remove('hidden');
+        }
     } catch (err) {
         noseModeActive = false;
         console.error('Error accessing camera:', err);
@@ -1954,6 +1968,9 @@ async function startNoseMode() {
 function stopNoseMode() {
     noseModeActive = false;
     noseDrawing = false;
+    if (detectionWaitOverlay) {
+        detectionWaitOverlay.classList.add('hidden');
+    }
     if (eyeModeActive) return;
 
     if (camera) {
@@ -2050,6 +2067,9 @@ async function startEyeMode() {
         lastEyeX = 0;
         lastEyeY = 0;
         firstEyeDetection = true;
+        if (detectionWaitOverlay) {
+            detectionWaitOverlay.classList.remove('hidden');
+        }
     } catch (err) {
         eyeModeActive = false;
         console.error('Error accessing camera:', err);
@@ -2064,6 +2084,9 @@ async function startEyeMode() {
 function stopEyeMode() {
     eyeModeActive = false;
     eyeDrawing = false;
+    if (detectionWaitOverlay) {
+        detectionWaitOverlay.classList.add('hidden');
+    }
     if (noseModeActive) return;
 
     if (camera) {
@@ -2176,6 +2199,9 @@ function onHandResults(results) {
                 smoothedHandX = handX;
                 smoothedHandY = handY;
                 firstHandDetection = false;
+                if (detectionWaitOverlay) {
+                    detectionWaitOverlay.classList.add('hidden');
+                }
             } else {
                 smoothedHandX = smoothedHandX + HAND_SMOOTHING_FACTOR * (handX - smoothedHandX);
                 smoothedHandY = smoothedHandY + HAND_SMOOTHING_FACTOR * (handY - smoothedHandY);
@@ -2318,6 +2344,9 @@ async function startHandMode() {
         lastHandX = 0;
         lastHandY = 0;
         firstHandDetection = true;
+        if (detectionWaitOverlay) {
+            detectionWaitOverlay.classList.remove('hidden');
+        }
     } catch (err) {
         handModeActive = false;
         console.error('Error accessing camera:', err);
@@ -2332,6 +2361,9 @@ async function startHandMode() {
 function stopHandMode() {
     handModeActive = false;
     handDrawing = false;
+    if (detectionWaitOverlay && !noseModeActive && !eyeModeActive) {
+        detectionWaitOverlay.classList.add('hidden');
+    }
     
     if (camera && !noseModeActive && !eyeModeActive) {
         camera.stop();
