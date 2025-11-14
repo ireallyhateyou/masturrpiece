@@ -1,7 +1,16 @@
 # masturrpiece
-Computer vision demo,
-My first actual game (with a story and all), figure out what your painting GPA is! I struggled a lot with the tracking tbh, felt like I was running around in circles.
 
+![Screenshot](https://i.imgur.com/VR4zzgl.png)
+
+A computer vision drawing game where you recreate famous paintings using different input methods. Your artistic skills are graded and you'll receive a final GPA!
+
+## Requirements and deployment
+
+- Modern web browser with WebGL support
+- Webcam (for hand/face/eye tracking modes)
+- Camera permissions enabled 
+
+Since this is an HTML5 game, you can deploy this with however means you think works.
 
 <div align="center">
   <a href="https://moonshot.hackclub.com" target="_blank">
