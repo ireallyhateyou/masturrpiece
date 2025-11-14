@@ -1,4 +1,5 @@
 # masturrpiece
+Computer vision demo,
 My first actual game (with a story and all), figure out what your painting GPA is! I struggled a lot with the tracking tbh, felt like I was running around in circles.
 
 

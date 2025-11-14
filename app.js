@@ -11,7 +11,6 @@ function clampZeroToOne(value) {
 
 function resizeCanvas() {
     const comparisonSection = document.getElementById('comparisonSection');
-    
     const windowWidth = window.innerWidth || 1200;
     const windowHeight = window.innerHeight || 800;
     
@@ -24,7 +23,6 @@ function resizeCanvas() {
     }
     
     const availableHeight = Math.min(900, windowHeight - 200);
-    
     const limitWidth = Math.max(500, availableWidth);
     const limitHeight = Math.max(500, availableHeight);
     
@@ -268,7 +266,10 @@ brushSizeSlider.addEventListener('input', (e) => {
 clearBtn.addEventListener('click', () => {
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    updateCanvasVisibility();
+    ctx.beginPath();
+    if (handDrawing) handDrawing = false;
+    if (noseDrawing) noseDrawing = false;
+    if (eyeDrawing) eyeDrawing = false;
 });
 
 eraserBtn.addEventListener('click', () => {
@@ -412,7 +413,7 @@ const paintings = [
     { title: 'Mona Lisa', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg/500px-Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg' },
     { title: 'Girl with a Pearl Earring', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Meisje_met_de_parel.jpg/960px-Meisje_met_de_parel.jpg' },
     { title: 'The Scream', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f4/The_Scream.jpg/500px-The_Scream.jpg' },
-    { title: 'Black Square', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Kazimir_Malevich%2C_1915%2C_Black_Suprematic_Square%2C_oil_on_linen_canvas%2C_79.5_x_79.5_cm%2C_Tretyakov_Gallery%2C_Moscow.jpg/800px-Kazimir_Malevich%2C_1915%2C_Black_Suprematic_Square%2C_oil_on_linen_canvas%2C_79.5_x_79.5_cm%2C_Tretyakov_Gallery%2C_Moscow.jpg' }
+    { title: 'Black Square', src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/dc/Kazimir_Malevich%2C_1915%2C_Black_Suprematic_Square%2C_oil_on_linen_canvas%2C_79.5_x_79.5_cm%2C_Tretyakov_Gallery%2C_Moscow.jpg/960px-Kazimir_Malevich%2C_1915%2C_Black_Suprematic_Square%2C_oil_on_linen_canvas%2C_79.5_x_79.5_cm%2C_Tretyakov_Gallery%2C_Moscow.jpg' }
 ];
 
 let currentPaintingIndex = 0;
@@ -520,7 +521,6 @@ function compareImages(drawingData, referenceData, width, height) {
     let colorDiff = 0;
     let luminanceDiff = 0;
     let edgeDiff = 0;
-
     const drawingEdges = detectEdges(drawingData, width, height);
     const referenceEdges = detectEdges(referenceData, width, height);
     let drawingBrightnessSum = 0;
@@ -718,9 +718,6 @@ function showReference(show) {
 
 function setResultsBarVisible(visible) {
     resultsBar.classList.toggle('hidden', !visible);
-    if (gradeWrapper) {
-        gradeWrapper.classList.toggle('hidden', !visible);
-    }
     if (comparisonSection) {
         if (visible) {
             comparisonSection.classList.add('with-grade');
@@ -1238,6 +1235,10 @@ function finishGame() {
         canvasWrapper.classList.remove('hidden');
     }
     
+    if (gameBar) {
+        gameBar.classList.add('hidden');
+    }
+    
     canvas.classList.add('hidden');
     
     const drawingIndicator = document.querySelector('.drawing-indicator');
@@ -1343,8 +1344,11 @@ function finishGame() {
                 const gradeClass = `grade-${result.grade.replace('+', 'plus').replace('-', 'minus')}`;
                 gradeDisplay.classList.add(gradeClass);
                 gradeDisplay.classList.remove('hidden');
+                if (gradeWrapper) {
+                    gradeWrapper.classList.remove('hidden');
+                }
+                setResultsBarVisible(false);
             }
-            setResultsBarVisible(true);
             phaseLabel.textContent = 'Results';
             
             if (result && result.grade !== null) {
@@ -1594,6 +1598,17 @@ function onFaceMeshResults(results) {
             if (noseTip) {
             let noseX = noseTip.x;
             let noseY = noseTip.y;
+            
+            if (lastHandResults && lastHandResults.multiHandLandmarks && lastHandResults.multiHandLandmarks.length > 0) {
+                const handLandmarks = lastHandResults.multiHandLandmarks[0];
+                if (isHandCoveringNose(handLandmarks, noseX, noseY)) {
+                    if (noseDrawing) {
+                        ctx.beginPath();
+                        noseDrawing = false;
+                    }
+                    return;
+                }
+            }
             
             noseX = Math.max(0, Math.min(1, noseX));
             noseY = Math.max(0, Math.min(1, noseY));
@@ -1874,8 +1889,18 @@ async function startNoseMode() {
             updateVideoSize();
         }, 100);
 
+        if (!hands) {
+            try {
+                initializeHands();
+            } catch (err) {
+                console.warn('Could not initialize hands for nose mode:', err);
+            }
+        }
+        
         let lastFaceSend = 0;
+        let lastHandSend = 0;
         const FACE_SEND_THROTTLE = 33;
+        const HAND_SEND_THROTTLE = 33;
         
         camera = new Camera(video, {
             onFrame: async () => {
@@ -1887,6 +1912,17 @@ async function startNoseMode() {
                             await faceMesh.send({ image: video });
                         } catch (error) {
                             console.error('Error sending to face mesh:', error);
+                        }
+                    }
+                }
+                if (noseModeActive && hands) {
+                    const now = Date.now();
+                    if (now - lastHandSend >= HAND_SEND_THROTTLE) {
+                        lastHandSend = now;
+                        try {
+                            await hands.send({ image: video });
+                        } catch (error) {
+                            console.error('Error sending to hands:', error);
                         }
                     }
                 }
@@ -2070,6 +2106,26 @@ function initializeHands() {
     hands.onResults(onHandResults);
 }
 
+let lastHandResults = null;
+
+function isHandCoveringNose(handLandmarks, noseX, noseY) {
+    if (!handLandmarks || handLandmarks.length < 21) return false;
+    
+    const COVERAGE_THRESHOLD = 0.15;
+    
+    for (let i = 0; i < handLandmarks.length; i++) {
+        const landmark = handLandmarks[i];
+        const distance = Math.sqrt(
+            Math.pow(landmark.x - noseX, 2) + 
+            Math.pow(landmark.y - noseY, 2)
+        );
+        if (distance < COVERAGE_THRESHOLD) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function isFist(landmarks) {
     if (!landmarks || landmarks.length < 21) return false;
     
@@ -2090,6 +2146,8 @@ function isFist(landmarks) {
 }
 
 function onHandResults(results) {
+    lastHandResults = results;
+    
     if (!handModeActive || !inputEnabled) return;
 
     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
@@ -2100,7 +2158,10 @@ function onHandResults(results) {
         
         // Check if hand is making a fist
         if (isFist(landmarks)) {
-            handDrawing = false;
+            if (handDrawing) {
+                ctx.beginPath();
+                handDrawing = false;
+            }
             return;
         }
         
@@ -2370,7 +2431,19 @@ function skipTyping() {
     activeTypewriters.forEach(interval => clearInterval(interval));
     activeTypewriters = [];
 
-    const dialogue = dialogueScript[currentDialogueIndex];
+    let dialogue = null;
+    if (handStoryCallback !== null) {
+        dialogue = handStoryScript[handStoryIndex];
+    } else if (noseStoryCallback !== null) {
+        dialogue = noseStoryScript[noseStoryIndex];
+    } else if (eyesStoryCallback !== null) {
+        dialogue = eyesStoryScript[eyesStoryIndex];
+    } else {
+        dialogue = dialogueScript[currentDialogueIndex];
+    }
+    
+    if (!dialogue) return;
+    
     if (dialogue.image) {
         storyImage.src = dialogue.image;
         storyImage.classList.remove('hidden');
