@@ -129,7 +129,7 @@ function updateCursor(canvasX, canvasY) {
     noseCursor.classList.remove('hidden');
 }
 
-function drawHandWireframe(landmarks) {
+function drawHandWireframe(landmarks, isFistDetected = false) {
     if (!handWireframeCtx || handWireframeCanvas.classList.contains('hidden')) return;
     
     handWireframeCtx.clearRect(0, 0, handWireframeCanvas.width, handWireframeCanvas.height);
@@ -160,7 +160,7 @@ function drawHandWireframe(landmarks) {
         }
     });
     
-    if (landmarks[8]) {
+    if (landmarks[8] && !isFistDetected) {
         handWireframeCtx.fillStyle = '#ff0000';
         handWireframeCtx.beginPath();
         handWireframeCtx.arc(
@@ -1032,7 +1032,7 @@ async function startDrawPhase() {
     } else if (paintingNumber === 2) {
         phaseLabel.textContent = '';
         if (yourDrawingTitle) {
-            yourDrawingTitle.textContent = 'Draw with your hand';
+            yourDrawingTitle.textContent = 'Draw with your hand, make a fist to stop drawing';
         }
         stopNoseMode();
         if (mouseDrawingImage) {
@@ -1050,7 +1050,7 @@ async function startDrawPhase() {
     } else if (paintingNumber === 3) {
         phaseLabel.textContent = '';
         if (yourDrawingTitle) {
-            yourDrawingTitle.textContent = 'Draw with your nose';
+            yourDrawingTitle.textContent = 'Draw with your nose, cover it to stop drawing';
         }
         stopHandMode();
         if (mouseDrawingImage) {
@@ -1068,7 +1068,7 @@ async function startDrawPhase() {
     } else if (paintingNumber === 4) {
         phaseLabel.textContent = '';
         if (yourDrawingTitle) {
-            yourDrawingTitle.textContent = 'Draw with your eyes';
+            yourDrawingTitle.textContent = 'Draw with your eyes, close one eye to draw with one brush';
         }
         stopNoseMode();
         stopHandMode();
@@ -1519,6 +1519,7 @@ let smoothedEyeY = 0;
 let firstNoseDetection = true;
 let firstEyeDetection = true;
 let firstHandDetection = true;
+let fistCooldownUntil = 0;
 let extractedColors = [];
 
 function extractPrimaryColors(img) {
@@ -2264,10 +2265,21 @@ function onHandResults(results) {
     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
         const landmarks = results.multiHandLandmarks[0];
         const indexFinger = landmarks[8];
+        const fistDetected = isFist(landmarks);
         
-        drawHandWireframe(landmarks);
+        drawHandWireframe(landmarks, fistDetected);
         
-        if (isFist(landmarks)) {
+        const now = Date.now();
+        if (fistDetected) {
+            if (handDrawing) {
+                ctx.beginPath();
+                handDrawing = false;
+            }
+            fistCooldownUntil = now + 2000;
+            return;
+        }
+        
+        if (now < fistCooldownUntil) {
             if (handDrawing) {
                 ctx.beginPath();
                 handDrawing = false;
