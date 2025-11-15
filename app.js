@@ -1736,26 +1736,48 @@ function onFaceMeshResults(results) {
         }
         
         if (eyeModeActive) {
-            // Use multiple landmarks for more stable eye center detection
-            // Left eye: landmarks 33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246
-            // Right eye: landmarks 362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398
-            // Use iris centers: 468 (left) and 473 (right) as primary, fallback to eye corners
+            const leftEyeTop = landmarks[159];
+            const leftEyeBottom = landmarks[145];
+            const leftEyeOuter = landmarks[33];
+            const leftEyeInner = landmarks[133];
+            
+            const rightEyeTop = landmarks[386];
+            const rightEyeBottom = landmarks[374];
+            const rightEyeOuter = landmarks[263];
+            const rightEyeInner = landmarks[362];
+            
+            function calculateEAR(top, bottom, outer, inner) {
+                const vertical1 = Math.sqrt(Math.pow(top.x - bottom.x, 2) + Math.pow(top.y - bottom.y, 2));
+                const vertical2 = Math.sqrt(Math.pow(outer.x - inner.x, 2) + Math.pow(outer.y - inner.y, 2));
+                const horizontal = Math.sqrt(Math.pow(outer.x - inner.x, 2) + Math.pow(outer.y - inner.y, 2));
+                if (horizontal === 0) return 1;
+                return (vertical1 + vertical2) / (2 * horizontal);
+            }
+            
+            const leftEAR = calculateEAR(leftEyeTop, leftEyeBottom, leftEyeOuter, leftEyeInner);
+            const rightEAR = calculateEAR(rightEyeTop, rightEyeBottom, rightEyeOuter, rightEyeInner);
+            
+            const EAR_THRESHOLD = 0.25;
+            const leftEyeClosed = leftEAR < EAR_THRESHOLD;
+            const rightEyeClosed = rightEAR < EAR_THRESHOLD;
+            
+            if (leftEyeClosed || rightEyeClosed) {
+                if (eyeDrawing) {
+                    ctx.beginPath();
+                    eyeDrawing = false;
+                }
+                return;
+            }
             
             const leftIris = landmarks[468];
             const rightIris = landmarks[473];
-            const leftEyeOuter = landmarks[33];
-            const leftEyeInner = landmarks[133];
-            const rightEyeOuter = landmarks[263];
-            const rightEyeInner = landmarks[362];
             
             let eyeX, eyeY;
             
             if (leftIris && rightIris) {
-                // Use iris centers if available
                 eyeX = (leftIris.x + rightIris.x) / 2;
                 eyeY = (leftIris.y + rightIris.y) / 2;
             } else if (leftEyeOuter && leftEyeInner && rightEyeOuter && rightEyeInner) {
-                // Fallback to eye corners
                 const leftEyeCenterX = (leftEyeOuter.x + leftEyeInner.x) / 2;
                 const leftEyeCenterY = (leftEyeOuter.y + leftEyeInner.y) / 2;
                 const rightEyeCenterX = (rightEyeOuter.x + rightEyeInner.x) / 2;
@@ -1763,7 +1785,7 @@ function onFaceMeshResults(results) {
                 eyeX = (leftEyeCenterX + rightEyeCenterX) / 2;
                 eyeY = (leftEyeCenterY + rightEyeCenterY) / 2;
             } else {
-                return; // No valid eye landmarks detected
+                return;
             }
             
             if (eyeX !== undefined && eyeY !== undefined) {
@@ -1902,9 +1924,9 @@ function initializeFaceMesh() {
 
     faceMesh.setOptions({
         maxNumFaces: 1,
-        refineLandmarks: false,
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5,
+        refineLandmarks: true,
+        minDetectionConfidence: 0.3,
+        minTrackingConfidence: 0.3,
         selfieMode: true
     });
 
@@ -2204,20 +2226,34 @@ function isHandCoveringNose(handLandmarks, noseX, noseY) {
 function isFist(landmarks) {
     if (!landmarks || landmarks.length < 21) return false;
     
-    // Check if all fingertips are below their PIP joints (fingers curled)
-    // Thumb: tip (4) below IP (3)
-    // Index: tip (8) below PIP (6)
-    // Middle: tip (12) below PIP (10)
-    // Ring: tip (16) below PIP (14)
-    // Pinky: tip (20) below PIP (18)
+    const wrist = landmarks[0];
+    const indexBase = landmarks[5];
+    const pinkyBase = landmarks[17];
+    const palmCenterX = (wrist.x + indexBase.x + pinkyBase.x) / 3;
+    const palmCenterY = (wrist.y + indexBase.y + pinkyBase.y) / 3;
     
-    const thumbClosed = landmarks[4].y > landmarks[3].y;
-    const indexClosed = landmarks[8].y > landmarks[6].y;
-    const middleClosed = landmarks[12].y > landmarks[10].y;
-    const ringClosed = landmarks[16].y > landmarks[14].y;
-    const pinkyClosed = landmarks[20].y > landmarks[18].y;
+    const FIST_THRESHOLD = 0.15;
     
-    return thumbClosed && indexClosed && middleClosed && ringClosed && pinkyClosed;
+    const thumbTip = landmarks[4];
+    const indexTip = landmarks[8];
+    const middleTip = landmarks[12];
+    const ringTip = landmarks[16];
+    const pinkyTip = landmarks[20];
+    
+    const thumbDist = Math.sqrt(Math.pow(thumbTip.x - palmCenterX, 2) + Math.pow(thumbTip.y - palmCenterY, 2));
+    const indexDist = Math.sqrt(Math.pow(indexTip.x - palmCenterX, 2) + Math.pow(indexTip.y - palmCenterY, 2));
+    const middleDist = Math.sqrt(Math.pow(middleTip.x - palmCenterX, 2) + Math.pow(middleTip.y - palmCenterY, 2));
+    const ringDist = Math.sqrt(Math.pow(ringTip.x - palmCenterX, 2) + Math.pow(ringTip.y - palmCenterY, 2));
+    const pinkyDist = Math.sqrt(Math.pow(pinkyTip.x - palmCenterX, 2) + Math.pow(pinkyTip.y - palmCenterY, 2));
+    
+    const thumbClosed = landmarks[4].y > landmarks[3].y || thumbDist < FIST_THRESHOLD;
+    const indexClosed = landmarks[8].y > landmarks[6].y || indexDist < FIST_THRESHOLD;
+    const middleClosed = landmarks[12].y > landmarks[10].y || middleDist < FIST_THRESHOLD;
+    const ringClosed = landmarks[16].y > landmarks[14].y || ringDist < FIST_THRESHOLD;
+    const pinkyClosed = landmarks[20].y > landmarks[18].y || pinkyDist < FIST_THRESHOLD;
+    
+    const closedCount = [thumbClosed, indexClosed, middleClosed, ringClosed, pinkyClosed].filter(Boolean).length;
+    return closedCount >= 4;
 }
 
 function onHandResults(results) {
@@ -2231,7 +2267,6 @@ function onHandResults(results) {
         
         drawHandWireframe(landmarks);
         
-        // Check if hand is making a fist
         if (isFist(landmarks)) {
             if (handDrawing) {
                 ctx.beginPath();
